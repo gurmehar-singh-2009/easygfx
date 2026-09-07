@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>fps shooter</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                overflow: hidden;
+            }
+            canvas {
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <script type="module">
+            import {
+                Backends,
+                Engine,
+                PerspectiveCamera,
+                MeshBuilder,
+                FPSController,
+                Vector3,
+                Quaternion,
+            } from "https://cdn.jsdelivr.net/gh/gurmehar-singh-2009/easygfx@main/dist/index.js";
+
+            const canvas = document.createElement("canvas");
+            document.body.appendChild(canvas);
+
+            const engine = new Engine(canvas, {
+                backend: Backends.WEBGPU,
+                antialias: true,
+                debug: false,
+            });
+
+            const cam = new PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000,
+                new Vector3(0, 2, 20),
+            );
+
+            function handleResize() {
+                engine.resize(window.innerWidth, window.innerHeight);
+                cam.aspectRatio = window.innerWidth / window.innerHeight;
+                cam.updateProjectionMatrix();
+            }
+            window.addEventListener("resize", handleResize);
+            handleResize();
+
+            engine.start();
+
+            const fps = new FPSController(cam, {
+                speed: 10,
+                sensitivity: 0.002,
+            }).attach(canvas);
+
+            const targets = [];
+            const projectiles = [];
+            let score = 0;
+            let shotsFired = 0;
+            let shotsHit = 0;
+            let lastSpawnTime = 0;
+
+            const GRAVITY = -20;
+            const PROJECTILE_SPEED = 80;
+            const HIT_RADIUS = 2.0;
+
+            function spawnTarget() {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 12 + Math.random() * 20;
+                targets.push({
+                    pos: new Vector3(
+                        Math.cos(angle) * dist,
+                        1 + Math.random() * 2,
+                        Math.sin(angle) * dist,
+                    ),
+                    alive: true,
+                    dying: false,
+                    deathTime: 0,
+                    hue: Math.random(),
+                    vel: new Vector3(
+                        (Math.random() - 0.5) * 3,
+                        0,
+                        (Math.random() - 0.5) * 3,
+                    ),
+                });
+            }
+
+            for (let i = 0; i < 8; i++) spawnTarget();
+
+            canvas.addEventListener("mousedown", (e) => {
+                if (e.button === 0 && document.pointerLockElement === canvas) {
+                    shoot();
+                }
+            });
+
+            function shoot() {
+                const forward = fps.forward();
+
+                const spawnPos = new Vector3(
+                    cam.position.x + forward[0] * 1.5,
+                    cam.position.y + forward[1] * 1.5 - 0.3,
+                    cam.position.z + forward[2] * 1.5,
+                );
+
+                const spread = 0.015;
+                const spreadX = (Math.random() - 0.5) * spread;
+                const spreadY = (Math.random() - 0.5) * spread;
+
+                projectiles.push({
+                    pos: spawnPos,
+                    vel: new Vector3(
+                        (forward[0] + spreadX) * PROJECTILE_SPEED,
+                        (forward[1] + spreadY) * PROJECTILE_SPEED,
+                        (forward[2] + spreadX) * PROJECTILE_SPEED,
+                    ),
+                    life: 2.5,
+                });
+
+                shotsFired++;
+            }
+
+            function getRightVector() {
+                const cp = Math.cos(fps.pitch);
+                const fx = -cp * Math.sin(fps.yaw);
+                const fz = -cp * Math.cos(fps.yaw);
+                return new Vector3(-fz, 0, fx);
+            }
+
+            function updatePhysics(dt, timestamp) {
+                for (let i = projectiles.length - 1; i >= 0; i--) {
+                    const p = projectiles[i];
+                    p.life -= dt;
+                    p.vel.y += GRAVITY * dt;
+                    p.pos.x += p.vel.x * dt;
+                    p.pos.y += p.vel.y * dt;
+                    p.pos.z += p.vel.z * dt;
+
+                    if (p.pos.y < 0 || p.life <= 0) {
+                        projectiles.splice(i, 1);
+                        continue;
+                    }
+
+                    let hit = false;
+                    for (const target of targets) {
+                        if (!target.alive || target.dying) continue;
+                        const dist = p.pos.distanceTo(target.pos);
+                        if (dist < HIT_RADIUS) {
+                            target.dying = true;
+                            target.deathTime = timestamp;
+                            shotsHit++;
+                            score += 100;
+                            hit = true;
+                            setTimeout(
+                                spawnTarget,
+                                1000 + Math.random() * 1500,
+                            );
+                            break;
+                        }
+                    }
+                    if (hit) projectiles.splice(i, 1);
+                }
+
+                for (let i = targets.length - 1; i >= 0; i--) {
+                    const t = targets[i];
+                    if (t.dying && timestamp - t.deathTime > 600) {
+                        targets.splice(i, 1);
+                        continue;
+                    }
+                    if (t.alive && !t.dying) {
+                        t.pos.x += t.vel.x * dt;
+                        t.pos.z += t.vel.z * dt;
+                        const dist = Math.hypot(t.pos.x, t.pos.z);
+                        if (dist > 32) {
+                            t.vel.x = -t.vel.x;
+                            t.vel.z = -t.vel.z;
+                        }
+                    }
+                }
+
+                const aliveTargets = targets.filter((t) => !t.dying).length;
+                if (aliveTargets < 4 && timestamp - lastSpawnTime > 1500) {
+                    spawnTarget();
+                    lastSpawnTime = timestamp;
+                }
+            }
+
+            engine.onFrame = (renderer, timestamp, delta) => {
+                const dt = Math.min(delta / 1000, 0.05);
+                fps.update(dt);
+                updatePhysics(dt, timestamp);
+
+                renderer.createMesh(0, MeshBuilder.plane(100, 100)); // ground
+                renderer.createMesh(1, MeshBuilder.box(1, 1, 1)); // multi-purpose box
+                renderer.createMesh(2, MeshBuilder.sphere(0.2, 8, 6)); // projectile
+
+                renderer.setCamera(cam);
+                renderer.clear(12, 15, 22, 1);
+
+                const time = timestamp / 1000;
+
+                renderer.setColor(35, 40, 50, 1);
+                renderer.drawMesh(0, new Vector3(0, 0, 0));
+
+                renderer.setColor(50, 55, 70, 1);
+                for (let x = -50; x <= 50; x += 10) {
+                    renderer.drawMesh(
+                        1,
+                        new Vector3(x, 0.01, 0),
+                        Quaternion.identity(),
+                        new Vector3(0.1, 0.02, 100),
+                    );
+                    renderer.drawMesh(
+                        1,
+                        new Vector3(0, 0.01, x),
+                        Quaternion.identity(),
+                        new Vector3(100, 0.02, 0.1),
+                    );
+                }
+
+                renderer.setColor(60, 70, 90, 1);
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const px = Math.cos(angle) * 35;
+                    const pz = Math.sin(angle) * 35;
+                    renderer.drawMesh(
+                        1,
+                        new Vector3(px, 5, pz),
+                        Quaternion.identity(),
+                        new Vector3(2, 10, 2),
+                    );
+                }
+
+                for (const target of targets) {
+                    if (target.dying) {
+                        const deathProgress =
+                            (timestamp - target.deathTime) / 600;
+                        if (deathProgress > 1) continue;
+                        const scale = Math.max(0.05, 1 - deathProgress);
+                        renderer.setColor(255, 80, 80, 1 - deathProgress);
+                        renderer.drawMesh(
+                            1,
+                            new Vector3(
+                                target.pos.x,
+                                Math.max(
+                                    0.2,
+                                    target.pos.y * (1 - deathProgress),
+                                ),
+                                target.pos.z,
+                            ),
+                            Quaternion.fromAxisAngle(
+                                new Vector3(0, 1, 0),
+                                deathProgress * 15,
+                            ),
+                            new Vector3(scale, scale, scale),
+                        );
+                    } else {
+                        const bob =
+                            Math.sin(time * 2.5 + target.hue * 10) * 0.4;
+                        const spin = Quaternion.fromAxisAngle(
+                            new Vector3(0, 1, 0),
+                            time * 2 + target.hue * 20,
+                        );
+                        const r = Math.floor(
+                            120 + 135 * Math.sin(target.hue * Math.PI * 2),
+                        );
+                        const g = Math.floor(
+                            120 +
+                                135 *
+                                    Math.sin(target.hue * Math.PI * 2 + 2.094),
+                        );
+                        const b = Math.floor(
+                            120 +
+                                135 *
+                                    Math.sin(target.hue * Math.PI * 2 + 4.188),
+                        );
+
+                        renderer.setColor(r, g, b, 1);
+                        renderer.drawMesh(
+                            1,
+                            new Vector3(target.pos.x, 1.5 + bob, target.pos.z),
+                            spin,
+                            new Vector3(1.5, 1.5, 1.5),
+                        );
+                    }
+                }
+
+                renderer.setColor(255, 255, 100, 1);
+                for (const p of projectiles) {
+                    renderer.drawMesh(
+                        2,
+                        p.pos,
+                        Quaternion.identity(),
+                        new Vector3(1, 1, 1),
+                    );
+
+                    const trailDir = p.vel.clone().normalize().mul(-0.8);
+                    renderer.setColor(255, 200, 0, 0.5);
+                    renderer.drawMesh(
+                        2,
+                        p.pos.clone().add(trailDir),
+                        Quaternion.identity(),
+                        new Vector3(0.6, 0.6, 0.6),
+                    );
+                }
+
+                const forward = fps.forward();
+                const right = getRightVector();
+
+                const crossDist = 6;
+                const crossX = cam.position.x + forward[0] * crossDist;
+                const crossY = cam.position.y + forward[1] * crossDist;
+                const crossZ = cam.position.z + forward[2] * crossDist;
+
+                renderer.setColor(255, 255, 255, 1);
+                renderer.drawMesh(
+                    1,
+                    new Vector3(crossX, crossY, crossZ),
+                    Quaternion.identity(),
+                    new Vector3(0.15, 0.15, 0.15),
+                );
+                renderer.drawMesh(
+                    1,
+                    new Vector3(
+                        crossX + right.x * 0.5,
+                        crossY,
+                        crossZ + right.z * 0.5,
+                    ),
+                    Quaternion.identity(),
+                    new Vector3(0.3, 0.05, 0.05),
+                );
+                renderer.drawMesh(
+                    1,
+                    new Vector3(
+                        crossX - right.x * 0.5,
+                        crossY,
+                        crossZ - right.z * 0.5,
+                    ),
+                    Quaternion.identity(),
+                    new Vector3(0.3, 0.05, 0.05),
+                );
+                renderer.drawMesh(
+                    1,
+                    new Vector3(crossX, crossY + 0.5, crossZ),
+                    Quaternion.identity(),
+                    new Vector3(0.05, 0.3, 0.05),
+                );
+                renderer.drawMesh(
+                    1,
+                    new Vector3(crossX, crossY - 0.5, crossZ),
+                    Quaternion.identity(),
+                    new Vector3(0.05, 0.3, 0.05),
+                );
+
+                const hudDist = 10;
+                const hudBaseX = cam.position.x + forward[0] * hudDist;
+                const hudBaseY = cam.position.y + forward[1] * hudDist + 3;
+                const hudBaseZ = cam.position.z + forward[2] * hudDist;
+
+                const scoreBoxes = Math.min(10, Math.floor(score / 100));
+                for (let i = 0; i < 10; i++) {
+                    const offsetX = (i - 4.5) * 0.8;
+                    const boxX = hudBaseX + right.x * offsetX;
+                    const boxZ = hudBaseZ + right.z * offsetX;
+
+                    if (i < scoreBoxes) {
+                        renderer.setColor(0, 255, 100, 1);
+                    } else {
+                        renderer.setColor(80, 80, 80, 0.5);
+                    }
+                    renderer.drawMesh(
+                        1,
+                        new Vector3(boxX, hudBaseY, boxZ),
+                        Quaternion.identity(),
+                        new Vector3(0.4, 0.4, 0.05),
+                    );
+                }
+
+                const recentShots = Math.max(0, 10 - (shotsFired % 20)); // cycles
+                for (let i = 0; i < 10; i++) {
+                    const offsetX = 3 + (i - 4.5) * 0.4;
+                    const boxX = hudBaseX + right.x * offsetX;
+                    const boxZ = hudBaseZ + right.z * offsetX;
+                    const boxY = hudBaseY - 5.5;
+
+                    if (i < recentShots) {
+                        renderer.setColor(255, 200, 50, 1);
+                    } else {
+                        renderer.setColor(60, 60, 60, 0.5);
+                    }
+                    renderer.drawMesh(
+                        2,
+                        new Vector3(boxX, boxY, boxZ),
+                        Quaternion.identity(),
+                        new Vector3(0.5, 0.5, 0.5),
+                    );
+                }
+
+                if (document.pointerLockElement !== canvas) {
+                    const pulse = Math.sin(time * 4) * 0.3 + 0.7;
+                    const ringRadius = 1 + pulse * 0.5;
+                    renderer.setColor(255, 255, 0, 0.7);
+
+                    for (let i = 0; i < 12; i++) {
+                        const angle = (i / 12) * Math.PI * 2;
+                        const rx = Math.cos(angle) * ringRadius;
+                        const ry = Math.sin(angle) * ringRadius;
+                        renderer.drawMesh(
+                            1,
+                            new Vector3(
+                                crossX + right.x * rx,
+                                crossY + ry,
+                                crossZ + right.z * rx,
+                            ),
+                            Quaternion.identity(),
+                            new Vector3(0.2, 0.2, 0.2),
+                        );
+                    }
+                }
+            };
+        </script>
+    </body>
+</html>

@@ -16,6 +16,234 @@ export class RenderEvent {
 
   constructor(canvas: HTMLCanvasElement, configs: RenderConfigs) {
     this.configs = configs;
+
+    if (configs.backend === Backends.WEBGPU) {
+      const guide =
+        "https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips";
+
+      const showWebGPUError = (message: string): void => {
+        const dialog = document.createElement("dialog");
+
+        dialog.style.cssText = `
+          all: initial !important;
+          position: fixed !important;
+          inset: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          max-width: none !important;
+          max-height: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          border: 0 !important;
+          background: transparent !important;
+          color: initial !important;
+          font: initial !important;
+          z-index: 2147483647 !important;
+        `;
+
+        const container = document.createElement("div");
+
+        container.style.cssText = `
+          all: initial !important;
+          position: absolute !important;
+          top: 50% !important;
+          left: 50% !important;
+          transform: translate(-50%, -50%) !important;
+
+          box-sizing: border-box !important;
+          width: min(500px, calc(100vw - 40px)) !important;
+
+          padding: 24px !important;
+          border: 1px solid #444 !important;
+          border-radius: 10px !important;
+
+          background: #1e1e1e !important;
+          color: #ffffff !important;
+
+          font-family: Arial, sans-serif !important;
+          font-size: 16px !important;
+          line-height: 1.5 !important;
+
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+        `;
+
+        const title = document.createElement("h2");
+
+        title.textContent = "WebGPU is unavailable";
+
+        title.style.cssText = `
+          all: initial !important;
+          display: block !important;
+          margin: 0 0 12px 0 !important;
+
+          color: #ffffff !important;
+          font-family: Arial, sans-serif !important;
+          font-size: 22px !important;
+          font-weight: 700 !important;
+          line-height: 1.2 !important;
+        `;
+
+        const text = document.createElement("p");
+
+        text.textContent = message;
+
+        text.style.cssText = `
+          all: initial !important;
+          display: block !important;
+          margin: 0 0 16px 0 !important;
+
+          color: #dddddd !important;
+          font-family: Arial, sans-serif !important;
+          font-size: 16px !important;
+          line-height: 1.5 !important;
+        `;
+
+        const link = document.createElement("a");
+
+        link.href = guide;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Open the WebGPU troubleshooting guide";
+
+        link.style.cssText = `
+          all: initial !important;
+          display: inline-block !important;
+          margin-bottom: 16px !important;
+
+          color: #6ea8fe !important;
+          font-family: Arial, sans-serif !important;
+          font-size: 16px !important;
+          text-decoration: underline !important;
+          cursor: pointer !important;
+        `;
+
+        const copyButton = document.createElement("button");
+
+        copyButton.type = "button";
+        copyButton.textContent = "Copy link";
+
+        copyButton.style.cssText = `
+          all: initial !important;
+          display: inline-block !important;
+
+          box-sizing: border-box !important;
+          padding: 8px 14px !important;
+
+          border: 1px solid #555 !important;
+          border-radius: 6px !important;
+
+          background: #333333 !important;
+          color: #ffffff !important;
+
+          font-family: Arial, sans-serif !important;
+          font-size: 14px !important;
+
+          cursor: pointer !important;
+        `;
+
+        copyButton.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(guide);
+
+            copyButton.textContent = "Copied!";
+          } catch {
+            copyButton.textContent = "Copy failed";
+          }
+        });
+
+        const closeButton = document.createElement("button");
+
+        closeButton.type = "button";
+        closeButton.textContent = "Close";
+
+        closeButton.style.cssText = `
+          all: initial !important;
+          display: inline-block !important;
+
+          box-sizing: border-box !important;
+          margin-left: 8px !important;
+          padding: 8px 14px !important;
+
+          border: 1px solid #555 !important;
+          border-radius: 6px !important;
+
+          background: #333333 !important;
+          color: #ffffff !important;
+
+          font-family: Arial, sans-serif !important;
+          font-size: 14px !important;
+
+          cursor: pointer !important;
+        `;
+
+        closeButton.addEventListener("click", () => {
+          dialog.close();
+          dialog.remove();
+        });
+
+        container.appendChild(title);
+        container.appendChild(text);
+        container.appendChild(link);
+        container.appendChild(document.createElement("br"));
+        container.appendChild(copyButton);
+        container.appendChild(closeButton);
+
+        dialog.appendChild(container);
+        document.body.appendChild(dialog);
+
+        const style = document.createElement("style");
+
+        style.textContent = `
+          dialog[webgpu-error-dialog] {
+            all: initial !important;
+          }
+
+          dialog[webgpu-error-dialog]::backdrop {
+            all: initial !important;
+            background: rgba(0, 0, 0, 0.75) !important;
+          }
+        `;
+
+        document.head.appendChild(style);
+
+        dialog.setAttribute("webgpu-error-dialog", "");
+
+        dialog.addEventListener(
+          "close",
+          () => {
+            style.remove();
+            dialog.remove();
+          },
+          { once: true },
+        );
+
+        dialog.showModal();
+      };
+
+      // navigator.gpu does not exist when WebGPU isn't exposed.
+      if (!navigator.gpu) {
+        showWebGPUError(
+          "Your browser does not currently provide WebGPU. " +
+            "Please enable WebGPU or use a browser that supports it.",
+        );
+
+        throw new Error("WebGPU is not available.");
+      }
+
+      (async () => {
+        const adapter = await navigator.gpu.requestAdapter();
+
+        if (!adapter) {
+          showWebGPUError(
+            "WebGPU is available, but your browser could not find a compatible GPU adapter. " +
+              "Make sure hardware acceleration and WebGPU are enabled.",
+          );
+
+          throw new Error("No WebGPU adapter available.");
+        }
+      })();
+    }
+
     switch (configs.backend) {
       case Backends.CANVAS:
         this.backend = new CanvasBackend(canvas, configs);

@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>tile game</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                overflow: hidden;
+            }
+            canvas {
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <script type="module">
+            import {
+                Backends,
+                Engine,
+                Vector3,
+                Quaternion,
+                Matrix4,
+                computeViewProjMatrix,
+            } from "https://cdn.jsdelivr.net/gh/gurmehar-singh-2009/easygfx@main/dist/index.js";
+
+            const canvas = document.createElement("canvas");
+            document.body.appendChild(canvas);
+
+            const engine = new Engine(canvas, {
+                backend: Backends.WEBGPU,
+                antialias: false,
+                debug: false,
+            });
+
+            class GameCamera {
+                position = new Vector3(0, 0, 0);
+                rotation = Quaternion.identity();
+                projectionMatrix = new Matrix4();
+                viewMatrix = new Matrix4();
+                viewProjectionMatrix = new Matrix4();
+                camX = 0;
+                camY = 0;
+                _w = 1;
+                _h = 1;
+
+                constructor(w, h) {
+                    this.resize(w, h);
+                }
+
+                resize(w, h) {
+                    this._w = w;
+                    this._h = h;
+                    this._updateMatrix();
+                }
+
+                setPos(x, y) {
+                    this.camX = x;
+                    this.camY = y;
+                    this._updateMatrix();
+                }
+
+                _updateMatrix() {
+                    const m = computeViewProjMatrix(
+                        this._w,
+                        this._h,
+                        [this.camX, this.camY],
+                        1,
+                    );
+                    this.viewProjectionMatrix.data.set(m);
+                    this.position.x = this.camX;
+                    this.position.y = this.camY;
+                }
+
+                update() {}
+            }
+
+            const cam = new GameCamera(window.innerWidth, window.innerHeight);
+
+            function handleResize() {
+                engine.resize(window.innerWidth, window.innerHeight);
+            }
+            window.addEventListener("resize", handleResize);
+            handleResize();
+            engine.setCamera(cam);
+
+            const TILE = 48;
+            const MAP_W = 25;
+            const MAP_H = 25;
+
+            // 0=floor, 1=wall
+            const map = [];
+            for (let y = 0; y < MAP_H; y++) {
+                map[y] = [];
+                for (let x = 0; x < MAP_W; x++) {
+                    map[y][x] =
+                        x === 0 || x === MAP_W - 1 || y === 0 || y === MAP_H - 1
+                            ? 1
+                            : 0;
+                }
+            }
+
+            const wallSegs = [
+                [5, 5, 8, 1],
+                [5, 5, 1, 5],
+                [13, 5, 8, 1],
+                [13, 8, 1, 5],
+                [5, 12, 8, 1],
+                [5, 12, 1, 5],
+                [13, 15, 8, 1],
+                [13, 12, 1, 5],
+                [5, 19, 8, 1],
+                [5, 15, 1, 5],
+                [13, 19, 8, 1],
+                [17, 8, 1, 8],
+                [9, 8, 1, 5],
+            ];
+            for (const [wx, wy, ww, wh] of wallSegs) {
+                for (let y = wy; y < wy + wh; y++) {
+                    for (let x = wx; x < wx + ww; x++) {
+                        if (y > 0 && y < MAP_H - 1 && x > 0 && x < MAP_W - 1) {
+                            map[y][x] = 1;
+                        }
+                    }
+                }
+            }
+
+            const coinPositions = [
+                [3, 3],
+                [21, 3],
+                [3, 21],
+                [21, 21],
+                [7, 7],
+                [17, 7],
+                [7, 17],
+                [17, 17],
+                [11, 11],
+                [3, 11],
+                [21, 11],
+                [11, 3],
+                [11, 21],
+            ];
+            const coins = new Set();
+            for (const [cx, cy] of coinPositions) {
+                if (map[cy][cx] === 0) coins.add(`${cx},${cy}`);
+            }
+            const totalCoins = coins.size;
+
+            const player = {
+                x: 2 * TILE,
+                y: 2 * TILE,
+                w: 40,
+                h: 40,
+                speed: 280,
+            };
+
+            const keysDown = new Set();
+            document.addEventListener("keydown", (e) => {
+                if (
+                    [
+                        "KeyW",
+                        "KeyA",
+                        "KeyS",
+                        "KeyD",
+                        "ArrowUp",
+                        "ArrowDown",
+                        "ArrowLeft",
+                        "ArrowRight",
+                        "KeyR",
+                    ].includes(e.code)
+                ) {
+                    e.preventDefault();
+                }
+                keysDown.add(e.code);
+            });
+            document.addEventListener("keyup", (e) => keysDown.delete(e.code));
+
+            let score = 0;
+            let won = false;
+            let startTime = performance.now();
+            let endTime = 0;
+
+            function isSolid(tx, ty) {
+                if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return true;
+                return map[ty][tx] === 1;
+            }
+
+            function resetGame() {
+                player.x = 2 * TILE;
+                player.y = 2 * TILE;
+                score = 0;
+                won = false;
+                startTime = performance.now();
+                coins.clear();
+                for (const [cx, cy] of coinPositions) {
+                    if (map[cy][cx] === 0) coins.add(`${cx},${cy}`);
+                }
+            }
+
+            engine.start();
+
+            engine.onFrame = (renderer, timestamp, delta) => {
+                const dt = Math.min(delta / 1000, 0.05);
+                const W = window.innerWidth;
+                const H = window.innerHeight;
+                const time = timestamp / 1000;
+
+                if (keysDown.has("KeyR")) resetGame();
+
+                if (!won) {
+                    let dx = 0,
+                        dy = 0;
+                    if (keysDown.has("KeyW") || keysDown.has("ArrowUp"))
+                        dy = -1;
+                    if (keysDown.has("KeyS") || keysDown.has("ArrowDown"))
+                        dy = 1;
+                    if (keysDown.has("KeyA") || keysDown.has("ArrowLeft"))
+                        dx = -1;
+                    if (keysDown.has("KeyD") || keysDown.has("ArrowRight"))
+                        dx = 1;
+
+                    if (dx !== 0 || dy !== 0) {
+                        const len = Math.hypot(dx, dy);
+                        dx /= len;
+                        dy /= len;
+
+                        const newX = player.x + dx * player.speed * dt;
+                        const newY = player.y + dy * player.speed * dt;
+
+                        const px1 = Math.floor(newX / TILE);
+                        const py1 = Math.floor(player.y / TILE);
+                        const py2 = Math.floor(
+                            (player.y + player.h - 1) / TILE,
+                        );
+                        if (
+                            !isSolid(px1, py1) &&
+                            !isSolid(px1, py2) &&
+                            !isSolid(px1 + 1, py1) &&
+                            !isSolid(px1 + 1, py2)
+                        ) {
+                            player.x = newX;
+                        }
+
+                        const px3 = Math.floor(player.x / TILE);
+                        const px4 = Math.floor(
+                            (player.x + player.w - 1) / TILE,
+                        );
+                        const py3 = Math.floor(newY / TILE);
+                        const py4 = Math.floor((newY + player.h - 1) / TILE);
+                        if (
+                            !isSolid(px3, py3) &&
+                            !isSolid(px4, py3) &&
+                            !isSolid(px3, py4) &&
+                            !isSolid(px4, py4)
+                        ) {
+                            player.y = newY;
+                        }
+
+                        player.x = Math.max(
+                            0,
+                            Math.min(player.x, MAP_W * TILE - player.w),
+                        );
+                        player.y = Math.max(
+                            0,
+                            Math.min(player.y, MAP_H * TILE - player.h),
+                        );
+
+                        const ptx = Math.floor(
+                            (player.x + player.w / 2) / TILE,
+                        );
+                        const pty = Math.floor(
+                            (player.y + player.h / 2) / TILE,
+                        );
+                        const key = `${ptx},${pty}`;
+                        if (coins.has(key)) {
+                            coins.delete(key);
+                            score++;
+                            if (score >= totalCoins) {
+                                won = true;
+                                endTime = performance.now();
+                            }
+                        }
+                    }
+                }
+
+                const mapW = MAP_W * TILE;
+                const mapH = MAP_H * TILE;
+
+                let camX = player.x + player.w / 2 - W / 2;
+                let camY = player.y + player.h / 2 - H / 2;
+
+                if (mapW > W) {
+                    camX = Math.max(0, Math.min(camX, mapW - W));
+                } else {
+                    camX = (mapW - W) / 2;
+                }
+
+                if (mapH > H) {
+                    camY = Math.max(0, Math.min(camY, mapH - H));
+                } else {
+                    camY = (mapH - H) / 2;
+                }
+
+                cam.setPos(camX, camY);
+
+                renderer.clear(12, 12, 20, 1);
+
+                renderer.setDepth(0.9);
+
+                const startTx = Math.max(0, Math.floor(camX / TILE));
+                const startTy = Math.max(0, Math.floor(camY / TILE));
+                const endTx = Math.min(MAP_W, Math.ceil((camX + W) / TILE));
+                const endTy = Math.min(MAP_H, Math.ceil((camY + H) / TILE));
+
+                for (let ty = startTy; ty < endTy; ty++) {
+                    for (let tx = startTx; tx < endTx; tx++) {
+                        if ((tx + ty) % 2 === 0) {
+                            renderer.setColor(40, 45, 60, 1);
+                        } else {
+                            renderer.setColor(35, 40, 52, 1);
+                        }
+                        renderer.drawRect(tx * TILE, ty * TILE, TILE, TILE);
+                    }
+                }
+
+                renderer.setDepth(0.7);
+
+                for (let ty = startTy; ty < endTy; ty++) {
+                    for (let tx = startTx; tx < endTx; tx++) {
+                        if (map[ty][tx] !== 1) continue;
+
+                        renderer.setColor(90, 100, 120, 1);
+                        renderer.drawRect(tx * TILE, ty * TILE, TILE, TILE);
+                        renderer.setColor(120, 130, 150, 1);
+                        renderer.drawRect(tx * TILE, ty * TILE, TILE, 6);
+                        renderer.drawRect(tx * TILE, ty * TILE, 6, TILE);
+                    }
+                }
+
+                renderer.setDepth(0.5);
+
+                for (const key of coins) {
+                    const [cx, cy] = key.split(",").map(Number);
+                    const wx = cx * TILE;
+                    const wy = cy * TILE;
+
+                    if (wx < camX - TILE || wx > camX + W + TILE) continue;
+                    if (wy < camY - TILE || wy > camY + H + TILE) continue;
+
+                    const pulse = Math.sin(time * 5 + cx + cy) * 0.3 + 0.7;
+                    const r = 15 * pulse;
+
+                    renderer.setColor(255, 200, 0, 0.3);
+                    renderer.drawCircle(wx + TILE / 2, wy + TILE / 2, r + 8);
+                    renderer.setColor(255, 200, 0, 1);
+                    renderer.drawCircle(wx + TILE / 2, wy + TILE / 2, r);
+                    renderer.setColor(255, 250, 150, 1);
+                    renderer.drawCircle(
+                        wx + TILE / 2 - 4,
+                        wy + TILE / 2 - 4,
+                        r * 0.35,
+                    );
+                }
+
+                renderer.setDepth(0.3);
+
+                const aura = Math.sin(time * 4) * 6 + 14;
+                renderer.setColor(255, 50, 50, 0.3);
+                renderer.drawCircle(
+                    player.x + player.w / 2,
+                    player.y + player.h / 2,
+                    player.w / 2 + aura,
+                );
+
+                renderer.setColor(255, 40, 40, 1);
+                renderer.drawRect(player.x, player.y, player.w, player.h);
+
+                renderer.setColor(255, 255, 255, 1);
+                renderer.drawRect(player.x, player.y, player.w, 5);
+                renderer.drawRect(
+                    player.x,
+                    player.y + player.h - 5,
+                    player.w,
+                    5,
+                );
+                renderer.drawRect(player.x, player.y, 5, player.h);
+                renderer.drawRect(
+                    player.x + player.w - 5,
+                    player.y,
+                    5,
+                    player.h,
+                );
+                renderer.drawCircle(
+                    player.x + player.w / 2,
+                    player.y + player.h / 2,
+                    8,
+                );
+
+                renderer.setColor(0, 0, 0, 1);
+                renderer.drawCircle(
+                    player.x + player.w / 2,
+                    player.y + player.h / 2,
+                    4,
+                );
+
+                renderer.setDepth(0.1);
+
+                const hudX = camX + 10;
+                const hudY = camY + 10;
+
+                renderer.setColor(0, 0, 0, 0.75);
+                renderer.drawRect(hudX, hudY, 380, 120);
+
+                renderer.setColor(255, 255, 255, 1);
+                renderer.drawRect(hudX, hudY, 380, 3);
+                renderer.drawRect(hudX, hudY + 117, 380, 3);
+                renderer.drawRect(hudX, hudY, 3, 120);
+                renderer.drawRect(hudX + 377, hudY, 3, 120);
+
+                renderer.setColor(255, 255, 255, 1);
+                renderer.drawText(
+                    hudX + 10,
+                    hudY + 25,
+                    "OBJECTIVE: COLLECT ALL COINS",
+                    16,
+                    0,
+                );
+                renderer.setColor(255, 220, 0, 1);
+                renderer.drawText(
+                    hudX + 10,
+                    hudY + 48,
+                    `Coins: ${score} / ${totalCoins}`,
+                    16,
+                    0,
+                );
+
+                if (!won) {
+                    const elapsed = (
+                        (performance.now() - startTime) /
+                        1000
+                    ).toFixed(1);
+                    renderer.setColor(150, 200, 255, 1);
+                    renderer.drawText(
+                        hudX + 10,
+                        hudY + 68,
+                        `Time: ${elapsed}s`,
+                        14,
+                        0,
+                    );
+                    renderer.setColor(180, 180, 180, 1);
+                    renderer.drawText(
+                        hudX + 10,
+                        hudY + 88,
+                        "WASD/Arrows: move  |  R: restart",
+                        12,
+                        0,
+                    );
+                    renderer.drawText(
+                        hudX + 10,
+                        hudY + 104,
+                        "You are the red square",
+                        12,
+                        0,
+                    );
+                } else {
+                    const elapsed = ((endTime - startTime) / 1000).toFixed(1);
+                    renderer.setColor(0, 255, 120, 1);
+                    renderer.drawText(hudX + 10, hudY + 68, "COMPLETE!", 16, 0);
+                    renderer.setColor(255, 255, 255, 1);
+                    renderer.drawText(
+                        hudX + 10,
+                        hudY + 88,
+                        `Time: ${elapsed}s`,
+                        14,
+                        0,
+                    );
+                    renderer.drawText(
+                        hudX + 10,
+                        hudY + 104,
+                        "Press R to play again",
+                        12,
+                        0,
+                    );
+                }
+            };
+        </script>
+    </body>
+</html>

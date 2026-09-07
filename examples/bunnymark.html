@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>bunnymark</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script type="module">
+        import {
+            Backends, Engine, Vector3, Quaternion, Matrix4, computeViewProjMatrix
+        } from "https://cdn.jsdelivr.net/gh/gurmehar-singh-2009/easygfx@main/dist/index.js";
+
+        const canvas = document.createElement("canvas");
+        document.body.appendChild(canvas);
+
+        const engine = new Engine(canvas, {
+            backend: Backends.WEBGL,
+            antialias: false,
+            debug: false,
+        });
+
+        alert("hold mouse to spawn \"bunnies\"");
+
+        class ScreenCamera {
+            position = new Vector3(0, 0, 0);
+            rotation = Quaternion.identity();
+            projectionMatrix = new Matrix4();
+            viewMatrix = new Matrix4();
+            viewProjectionMatrix = new Matrix4();
+            camX = 0;
+            camY = 0;
+            _w = 1;
+            _h = 1;
+
+            constructor(w, h) { this.resize(w, h); }
+
+            resize(w, h) {
+                this._w = w;
+                this._h = h;
+                this._updateMatrix();
+            }
+
+            setPos(x, y) {
+                this.camX = x;
+                this.camY = y;
+                this._updateMatrix();
+            }
+
+            _updateMatrix() {
+                const m = computeViewProjMatrix(this._w, this._h, [this.camX, this.camY], 1);
+                this.viewProjectionMatrix.data.set(m);
+            }
+
+            update() {}
+        }
+
+        const cam = new ScreenCamera(window.innerWidth, window.innerHeight);
+        engine.setCamera(cam);
+
+        function handleResize() {
+            engine.resize(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener("resize", handleResize);
+        handleResize();
+
+        const bunnies = [];
+        const BUNNY_W = 24;
+        const BUNNY_H = 32;
+        const GRAVITY = 900;
+
+        let mouseHeld = false;
+        let spawnAccum = 0;
+        const SPAWN_INTERVAL = 0.1;
+        const SPAWN_COUNT = 100;
+
+        window.addEventListener("mousedown", (e) => {
+            if (e.button === 0) mouseHeld = true;
+        });
+        window.addEventListener("mouseup", () => { mouseHeld = false; });
+        window.addEventListener("blur", () => { mouseHeld = false; });
+        window.addEventListener("contextmenu", (e) => e.preventDefault());
+
+        function spawnBunny() {
+            const W = window.innerWidth;
+            const H = window.innerHeight;
+            bunnies.push({
+                x: Math.random() * (W - BUNNY_W),
+                y: Math.random() * H * 0.3,
+                vx: (Math.random() - 0.5) * 400,
+                vy: (Math.random() - 0.5) * 200,
+            });
+        }
+
+        for (let i = 0; i < 20; i++) spawnBunny();
+
+        engine.start();
+
+        engine.onFrame = (renderer, timestamp, delta) => {
+            const dt = Math.min(delta / 1000, 0.05);
+            const W = window.innerWidth;
+            const H = window.innerHeight;
+
+            if (mouseHeld) {
+                spawnAccum += dt;
+                while (spawnAccum >= SPAWN_INTERVAL) {
+                    for (let i = 0; i < SPAWN_COUNT; i++) spawnBunny();
+                    spawnAccum -= SPAWN_INTERVAL;
+                }
+            } else {
+                spawnAccum = 0;
+            }
+
+            renderer.clear(20, 20, 30, 1);
+
+            renderer.setColor(200, 160, 120, 1);
+            const floorY = H - BUNNY_H;
+
+            for (let i = bunnies.length - 1; i >= 0; i--) {
+                const b = bunnies[i];
+
+                b.vy += GRAVITY * dt;
+                b.x += b.vx * dt;
+                b.y += b.vy * dt;
+
+                if (b.y > floorY) {
+                    b.y = floorY;
+                    b.vy = -Math.abs(b.vy) * 0.75;
+                    if (Math.abs(b.vy) < 60) {
+                        b.vy = -(Math.random() * 250 + 100);
+                    }
+                }
+                if (b.y < 0) { b.y = 0; b.vy = Math.abs(b.vy); }
+                if (b.x < 0) { b.x = 0; b.vx = Math.abs(b.vx); }
+                if (b.x > W - BUNNY_W) { b.x = W - BUNNY_W; b.vx = -Math.abs(b.vx); }
+
+                renderer.drawRect(b.x, b.y, BUNNY_W, BUNNY_H);
+            }
+        };
+    </script>
+</body>
+</html>

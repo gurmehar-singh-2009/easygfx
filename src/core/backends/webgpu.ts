@@ -115,9 +115,7 @@ export class WebGPUBackend implements Backend {
    */
   async initializeWebGPU(): Promise<void> {
     if (!navigator.gpu) {
-      alert(
-        "WEBGPU IS NOT SUPPORTED ON YOUR DEVICE. YOU CAN UPGRADE YOUR BROWSER OR RESORT TO CANVAS/WEBGL.",
-      );
+      alert("WEBGPU IS NOT SUPPORTED ON YOUR DEVICE. PLEASE FIX!!");
       return;
     }
 

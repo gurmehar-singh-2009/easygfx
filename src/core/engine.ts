@@ -36,7 +36,6 @@ export class Engine {
     const loop = (timestamp: DOMHighResTimeStamp) => {
       if (!this.active) return;
 
-      // FIX: clamp huge deltas (tab was backgrounded, debugger pause, etc.)
       const delta = Math.min(timestamp - this.lastFrameTimestamp, 100);
       this.lastFrameTimestamp = timestamp;
 
