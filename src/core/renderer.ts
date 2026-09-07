@@ -1,14 +1,9 @@
+import type { Material, MaterialData } from "../graphics/material";
 import type { Mesh, MeshData } from "../graphics/mesh";
+import type { Texture, TextureData } from "../graphics/texture";
 import type { Matrix4 } from "../math/matrix";
-import type { Quaternion } from "../math/quaternion";
-import type { Transform } from "../math/transform";
-import type { Vector2 } from "../math/vector2";
-import type { Vector3 } from "../math/vector3";
 import type { Camera } from "./camera";
 
-// didnt use this i guess
-// remove later
-export type Dimension = "2D" | "3D";
 
 /** Backends. */
 export enum Backends {
@@ -33,17 +28,15 @@ export interface RenderConfigs {
 	// default(): RenderConfigs;
 }
 
-export interface Texture {
-	id: string; // or number, maybe number better but decide later
-	source: HTMLImageElement | ImageBitmap;
-}
-
 export interface Backend {
 	clear?(r: number, g: number, b: number, a: number): void;
 
+	createTexture(data: TextureData): Texture;
+	createMaterial(data: MaterialData): Material;
+
 	createMesh(data: MeshData): Mesh;
 	updateMesh(mesh: Mesh, data: MeshData): void;
-	drawMesh(mesh: Mesh, transformMatrix: Matrix4): void;
+	drawMesh(mesh: Mesh, material: Material, transformMatrix: Matrix4): void;
 
 	resize?(width: number, height: number): void;
 	updateView?(camera: Camera): void;

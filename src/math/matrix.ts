@@ -1,5 +1,5 @@
 import { Vector3 } from "./vector3";
-import { Quaternion } from "./quaternion";
+import type { Quaternion } from "./quaternion";
 
 export class Matrix4 {
 	public data: Float32Array = new Float32Array(16);
@@ -90,7 +90,7 @@ export class Matrix4 {
 		b: Matrix4,
 		out: Matrix4 = new Matrix4(),
 	): Matrix4 {
-		let outData = out.data;
+		const outData = out.data;
 
 		const aData = a.data;
 		const bData = b.data;
@@ -156,7 +156,7 @@ export class Matrix4 {
 		return out;
 	}
 
-	// Maybe add a Matrix3 class later
+	// Maybe add a Matrix3 class later instead of returning a Float32Array(9).
 	public toNormalMatrix(out: Float32Array = new Float32Array(9)): Float32Array {
 		return Matrix4.normalMatrix(this, out);
 	}
@@ -168,13 +168,13 @@ export class Matrix4 {
 		const mData = m.data;
 
 		const a00 = mData[0]!;
-		const a01 = mData[1]!;
-		const a02 = mData[2]!;
-		const a10 = mData[4]!;
+		const a10 = mData[1]!;
+		const a20 = mData[2]!;
+		const a01 = mData[4]!;
 		const a11 = mData[5]!;
-		const a12 = mData[6]!;
-		const a20 = mData[8]!;
-		const a21 = mData[9]!;
+		const a21 = mData[6]!;
+		const a02 = mData[8]!;
+		const a12 = mData[9]!;
 		const a22 = mData[10]!;
 
 		const b01 = a22 * a11 - a12 * a21;
@@ -184,19 +184,13 @@ export class Matrix4 {
 		let determinant = a00 * b01 + a01 * b11 + a02 * b21;
 
 		if (determinant === 0) {
-			out[0] = 1;
-			out[1] = 0;
-			out[2] = 0;
-			out[3] = 0;
-			out[4] = 1;
-			out[5] = 0;
-			out[6] = 0;
-			out[7] = 0;
-			out[8] = 1;
+			out[0] = 1; out[1] = 0; out[2] = 0;
+			out[3] = 0; out[4] = 1; out[5] = 0;
+			out[6] = 0; out[7] = 0; out[8] = 1;
 			return out;
 		}
 
-		determinant = 1 / determinant;
+		determinant = 1.0 / determinant;
 
 		out[0] = b01 * determinant;
 		out[1] = (-a22 * a01 + a02 * a21) * determinant;
@@ -253,7 +247,7 @@ export class Matrix4 {
 		const twoYZ = y * twoZ;
 		const twoZZ = z * twoZ;
 
-		let outData = out.data;
+		const outData = out.data;
 
 		// Column 0
 		outData[0] = 1 - twoYY - twoZZ;
@@ -286,13 +280,17 @@ export class Matrix4 {
 		vertex1: Vector3,
 		vertex2: Vector3,
 		vertex3: Vector3,
-		out: Matrix4 = new Matrix4()
+		out: Matrix4 = new Matrix4(),
 	): Matrix4 {
-		let outData = out.data;
+		const outData = out.data;
 
 		Vector3.subtract(vertex2, vertex1, Matrix4.tempVector1);
 		Vector3.subtract(vertex3, vertex1, Matrix4.tempVector2);
-		Vector3.cross(Matrix4.tempVector1, Matrix4.tempVector2, Matrix4.tempVector3);
+		Vector3.cross(
+			Matrix4.tempVector1,
+			Matrix4.tempVector2,
+			Matrix4.tempVector3,
+		);
 
 		// Column 0
 		outData[0] = Matrix4.tempVector1.x;
@@ -326,7 +324,7 @@ export class Matrix4 {
 		const y = v.y;
 		const z = v.z;
 
-		let outData = out.data;
+		const outData = out.data;
 
 		// Column 0
 		outData[0] = 1;
@@ -367,7 +365,7 @@ export class Matrix4 {
 			return out;
 		}
 
-		let outData = out.data;
+		const outData = out.data;
 
 		const f = 1.0 / Math.tan((fov * Math.PI) / 360);
 		const rangeInverse = 1.0 / (near - far);
@@ -424,7 +422,7 @@ export class Matrix4 {
 		const inverseLeftRight = 1 / (left - right);
 		const inverseBottomTop = 1 / (bottom - top);
 		const inverseNearFar = 1 / (near - far);
-		let outData = out.data;
+		const outData = out.data;
 
 		// Column 0
 		outData[0] = -2 * inverseLeftRight;

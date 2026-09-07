@@ -22,7 +22,7 @@ export class MeshBuilder {
 		faces: Face[],
 		includeNormals = true,
 		includeUVs = true,
-		includeTangents = false,
+		includeTangents = true,
 	) {
 		const positions: number[] = [];
 		const normals: number[] = [];
@@ -86,9 +86,9 @@ export class MeshBuilder {
 	public static Quad(
 		width = 1,
 		height = 1,
-		includeNormals = false,
-		includeUVs = false,
-		includeTangents = false,
+		includeNormals = true,
+		includeUVs = true,
+		includeTangents = true,
 	): MeshData {
 		const hx = width / 2;
 		const hy = height / 2;
@@ -120,21 +120,21 @@ export class MeshBuilder {
 		);
 	}
 
-	public static UnitTriangle(includeNormals = false, includeUVs = false, includeTangents = false) {
+	public static UnitTriangle(
+		includeNormals = true,
+		includeUVs = true,
+		includeTangents = true,
+	) {
 		const faces: Face[] = [
 			{
 				vertices: [
 					new Vector3(0, 0, 0),
 					new Vector3(1, 0, 0),
-					new Vector3(0, 1, 0)
+					new Vector3(0, 1, 0),
 				],
 				normal: new Vector3(0, 0, 1),
 				tangent: new Vector4(1, 0, 0, 1),
-				uvs: [
-					new Vector2(0, 0),
-					new Vector2(1, 0),
-					new Vector2(0, 1)
-				],
+				uvs: [new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1)],
 			},
 		];
 
@@ -149,9 +149,9 @@ export class MeshBuilder {
 	public static RegularPolygon(
 		size: number,
 		sides: number,
-		includeNormals = false,
-		includeUVs = false,
-		includeTangents = false,
+		includeNormals = true,
+		includeUVs = true,
+		includeTangents = true,
 	): MeshData {
 		if (sides < 3) {
 			sides = 3;
@@ -160,7 +160,7 @@ export class MeshBuilder {
 		// Get radius
 		size /= 2;
 
-		let polygon: Face = {
+		const polygon: Face = {
 			vertices: [],
 			normal: new Vector3(0, 0, 1),
 			tangent: new Vector4(1, 0, 0, 1),
@@ -192,7 +192,7 @@ export class MeshBuilder {
 		depth = 1,
 		includeNormals = true,
 		includeUVs = true,
-		includeTangents = false,
+		includeTangents = true,
 	): MeshData {
 		const hx = width / 2;
 		const hy = height / 2;
@@ -310,6 +310,74 @@ export class MeshBuilder {
 			includeTangents,
 		);
 	}
+
+	// public static Cylinder(
+	// 	radius = 1,
+	// 	height = 1,
+	// 	segments = 10,
+	// 	includeNormals = true,
+	// 	includeUVs = true,
+	// 	includeTangents = true
+	// ): MeshData {
+	// 	if (segments < 3) {
+	// 		segments = 3;
+	// 	}
+
+	// 	const halfHeight = height / 2;
+
+	// 	let faces: Face[] = [];
+
+	// 	const top: Face = {
+	// 		vertices: [],
+	// 		normal: new Vector3(0, 1, 0),
+	// 		tangent: new Vector4(1, 0, 0, 1),
+	// 		uvs: [],
+	// 	};
+	// 	const bottom: Face = {
+	// 		vertices: [],
+	// 		normal: new Vector3(0, -1, 0),
+	// 		tangent: new Vector4(1, 0, 0, 1),
+	// 		uvs: [],
+	// 	};
+
+	// 	let angle = 0;
+	// 	let cosVal = 1;
+	// 	let sinVal = 0;
+
+	// 	top.vertices.push(new Vector3(radius * cosVal, halfHeight, radius * sinVal));
+	// 	top.uvs.push(new Vector2((cosVal + 1) / 2, (sinVal + 1) / 2));
+
+	// 	bottom.vertices.push(new Vector3(radius * cosVal, -halfHeight, radius * sinVal));
+	// 	bottom.uvs.push(new Vector2((cosVal + 1) / 2, (sinVal + 1) / 2));
+
+	// 	let prevTop = new Vector3(radius * cosVal, halfHeight, radius * sinVal);
+	// 	let prevBottom = new Vector3(radius * cosVal, halfHeight, radius * sinVal);
+
+	// 	const step = (Math.PI * 2) / segments;
+
+	// 	for (let i = 1; i < segments; i++) {
+	// 		angle = i * step;
+	// 		cosVal = Math.cos(angle);
+	// 		sinVal = Math.sin(angle);
+
+	// 		top.vertices.push(new Vector3(radius * cosVal, radius * sinVal, 0));
+	// 		top.uvs.push(new Vector2((cosVal + 1) / 2, (sinVal + 1) / 2));
+	// 	}
+
+	// 	return MeshBuilder.fromFaces(
+	// 		[polygon],
+	// 		includeNormals,
+	// 		includeUVs,
+	// 		includeTangents,
+	// 	);
+
+	// 	return MeshBuilder.fromFaces(
+	// 		faces,
+	// 		includeNormals,
+	// 		includeUVs,
+	// 		includeTangents,
+	// 	);
+	// }
 
 	// public static plane(width = 1, depth = 1, segments = 1): MeshData {
 	// 	const positions: number[] = [],

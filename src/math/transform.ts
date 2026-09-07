@@ -114,7 +114,7 @@ export class Transform {
 	public setTriangleTransform(
 		vertex1: Vector3,
 		vertex2: Vector3,
-		vertex3: Vector3
+		vertex3: Vector3,
 	): this {
 		Matrix4.fromTriangle(vertex1, vertex2, vertex3, this.matrix);
 

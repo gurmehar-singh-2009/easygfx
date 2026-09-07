@@ -1,4 +1,4 @@
-import { PerspectiveCamera } from "./camera";
+import type { PerspectiveCamera } from "./camera";
 import { Vector3 } from "../math/vector3";
 import { Quaternion } from "../math/quaternion";
 

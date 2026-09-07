@@ -1,11 +1,13 @@
 import type { RenderConfigs, Backend } from "../renderer";
-import { vertexShaderSource } from "../../graphics/shaders/webgl/vertex.ts";
-import { fragmentShaderSource } from "../../graphics/shaders/webgl/fragment.ts";
-import type { Camera } from "../camera.ts";
-import type { MeshData, Mesh } from "../../graphics/mesh.ts";
-import { Transform } from "../../math/transform.ts";
-import { Matrix4 } from "../../math/matrix.ts";
-import { Vector3 } from "../../math/vector3.ts";
+import { vertexShaderSource } from "../../graphics/shaders/webgl/vertex";
+import { fragmentShaderSource } from "../../graphics/shaders/webgl/fragment";
+import type { Camera } from "../camera";
+import type { MeshData, Mesh } from "../../graphics/mesh";
+import { Transform } from "../../math/transform";
+import { Matrix4 } from "../../math/matrix";
+import { Vector3 } from "../../math/vector3";
+import type { Material, MaterialData } from "../../graphics/material";
+import type { Texture, TextureData } from "../../graphics/texture";
 
 interface ShaderLocations {
 	program: WebGLProgram;
@@ -13,20 +15,37 @@ interface ShaderLocations {
 		position: GLint;
 		normal: GLint;
 		texCoord: GLint;
+		tangent: GLint;
 	};
 	uniforms: {
-		viewProjection: WebGLUniformLocation;
-		meshTransform: WebGLUniformLocation;
-		normalMatrix: WebGLUniformLocation;
+		viewProjection: WebGLUniformLocation | null;
+		meshTransform: WebGLUniformLocation | null;
+		normalMatrix: WebGLUniformLocation | null;
+
+		albedo: WebGLUniformLocation | null;
+		pbrProperties: WebGLUniformLocation | null;
+		textureIds: WebGLUniformLocation | null;
+
+		textures: WebGLUniformLocation | null;
 	};
 }
 
 export class WebGLBackend implements Backend {
 	configs: RenderConfigs;
 	private ctx: WebGL2RenderingContext;
-	private shaderLocations: ShaderLocations;
+	private shaderLocations!: ShaderLocations;
 
 	private tempNormalMatrix = new Float32Array(9);
+
+	private textureArray!: WebGLTexture;
+	private maxTextureLayers = 256;
+	private textureSize = 1024;
+	private nextTextureId = 0;
+
+	private offscreenCanvas = new OffscreenCanvas(1024, 1024);
+	private offscreenCtx = this.offscreenCanvas.getContext("2d")!;
+
+	private nextMaterialId = 0;
 
 	constructor(canvas: HTMLCanvasElement, configs: RenderConfigs) {
 		this.configs = configs;
@@ -36,16 +55,12 @@ export class WebGLBackend implements Backend {
 		this.ctx.enable(this.ctx.CULL_FACE);
 		this.ctx.cullFace(this.ctx.BACK);
 		this.ctx.frontFace(this.ctx.CCW);
-
-		this.shaderLocations = this.initShaderProgram(
-			vertexShaderSource,
-			fragmentShaderSource,
-		);
-
 		this.ctx.enable(this.ctx.BLEND);
 		this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
+		this.ctx.enable(this.ctx.DEPTH_TEST);
 
-		this.ctx.useProgram(this.shaderLocations.program);
+		this.initShaderProgram(vertexShaderSource, fragmentShaderSource);
+		this.initTextureArray();
 
 		this.resize(500, 500);
 	}
@@ -53,69 +68,146 @@ export class WebGLBackend implements Backend {
 	private initShaderProgram(
 		vertexShaderSource: string,
 		fragmentShaderSource: string,
-	): ShaderLocations {
-		let program = this.ctx.createProgram();
+	): void {
+		const program = this.ctx.createProgram();
 
-		this.ctx.attachShader(
-			program,
-			this.loadShader(this.ctx.VERTEX_SHADER, vertexShaderSource),
-		);
-		this.ctx.attachShader(
-			program,
-			this.loadShader(this.ctx.FRAGMENT_SHADER, fragmentShaderSource),
-		);
+		const vertexShader = this.loadShader(this.ctx.VERTEX_SHADER, vertexShaderSource);
+		const fragmentShader = this.loadShader(this.ctx.FRAGMENT_SHADER, fragmentShaderSource);
 
+		this.ctx.attachShader(program, vertexShader);
+		this.ctx.attachShader(program, fragmentShader);
 		this.ctx.linkProgram(program);
 
-		return {
+		if (!this.ctx.getProgramParameter(program, this.ctx.LINK_STATUS)) {
+			throw new Error(this.ctx.getProgramInfoLog(program) + "");
+		}
+
+		this.ctx.detachShader(program, vertexShader);
+		this.ctx.detachShader(program, fragmentShader);
+		this.ctx.deleteShader(vertexShader);
+		this.ctx.deleteShader(fragmentShader);
+
+		this.shaderLocations = {
 			program: program,
 
 			attributes: {
-				position: this.ctx.getAttribLocation(program, "a_position"),
-				normal: this.ctx.getAttribLocation(program, "a_normal"),
-				texCoord: this.ctx.getAttribLocation(program, "a_texCoord"),
+				position: this.getAttributeLocation(program, "a_position"),
+				normal: this.getAttributeLocation(program, "a_normal"),
+				texCoord: this.getAttributeLocation(program, "a_texCoord"),
+				tangent: this.getAttributeLocation(program, "a_tangent")
 			},
 
 			uniforms: {
-				viewProjection: this.ctx.getUniformLocation(
-					program,
-					"u_viewProjection",
-				)!,
-				meshTransform: this.ctx.getUniformLocation(program, "u_meshTransform")!,
-				normalMatrix: this.ctx.getUniformLocation(program, "u_normalMatrix")!,
-			},
+				viewProjection: this.getUniformLocation(program, "u_viewProjection")!,
+				meshTransform: this.getUniformLocation(program, "u_meshTransform")!,
+				normalMatrix: this.getUniformLocation(program, "u_normalMatrix")!,
+
+				albedo: this.getUniformLocation(program, "u_albedo")!,
+				pbrProperties: this.getUniformLocation(program, "u_pbrProperties")!,
+				textureIds: this.getUniformLocation(program, "u_textureIds")!,
+
+				textures: this.getUniformLocation(program, "u_textures")!
+			}
 		};
+
+		this.ctx.useProgram(program);
+
+		if (this.shaderLocations.uniforms.textures) {
+			this.ctx.uniform1i(this.shaderLocations.uniforms.textures, 0);
+		}
 	}
 
 	private loadShader(type: GLenum, source: string): WebGLShader {
-		let shader = this.ctx.createShader(type) as WebGLShader;
+		const shader = this.ctx.createShader(type) as WebGLShader;
 
 		this.ctx.shaderSource(shader, source);
 		this.ctx.compileShader(shader);
 
 		if (!this.ctx.getShaderParameter(shader, this.ctx.COMPILE_STATUS)) {
-			throw new Error("Shader Error: " + this.ctx.getShaderInfoLog(shader));
+			throw new Error("" + this.ctx.getShaderInfoLog(shader));
 		}
 
 		return shader;
 	}
 
-	public clear(r: number, g: number, b: number, a: number): void {
-		this.ctx.clearColor(r / 255, g / 255, b / 255, a);
-		this.ctx.clear(this.ctx.COLOR_BUFFER_BIT);
+	private getAttributeLocation(program: WebGLProgram, name: string): GLint {
+		const location = this.ctx.getAttribLocation(program, name);
+		if (location === -1) {
+			console.warn(`Attribute "${name}" not found.`);
+		}
+		return location;
 	}
 
-	public updateView(camera: Camera): void {
-		this.ctx.uniformMatrix4fv(
-			this.shaderLocations.uniforms.viewProjection,
-			false,
-			camera.viewProjectionMatrix.data,
+	private getUniformLocation(program: WebGLProgram, name: string): WebGLUniformLocation | null {
+		const location = this.ctx.getUniformLocation(program, name);
+		if (!location) {
+			console.warn(`Uniform "${name}" not found.`);
+		}
+		return location;
+	}
+
+
+	// ---------------------------------------------------------------------
+
+
+	private initTextureArray(): void {
+		this.textureArray = this.ctx.createTexture();
+
+		this.ctx.bindTexture(this.ctx.TEXTURE_2D_ARRAY, this.textureArray);
+
+		const mipLevels = Math.floor(Math.log2(this.textureSize)) + 1;
+		this.ctx.texStorage3D(
+			this.ctx.TEXTURE_2D_ARRAY,
+			mipLevels,
+			this.ctx.RGBA8,
+			this.textureSize,
+			this.textureSize,
+			this.maxTextureLayers
 		);
+
+		this.ctx.texParameteri(this.ctx.TEXTURE_2D_ARRAY, this.ctx.TEXTURE_MIN_FILTER, this.ctx.LINEAR_MIPMAP_LINEAR);
+		this.ctx.texParameteri(this.ctx.TEXTURE_2D_ARRAY, this.ctx.TEXTURE_MAG_FILTER, this.ctx.LINEAR);
+		this.ctx.texParameteri(this.ctx.TEXTURE_2D_ARRAY, this.ctx.TEXTURE_WRAP_S, this.ctx.REPEAT);
+		this.ctx.texParameteri(this.ctx.TEXTURE_2D_ARRAY, this.ctx.TEXTURE_WRAP_T, this.ctx.REPEAT);
+
+		this.ctx.bindTexture(this.ctx.TEXTURE_2D_ARRAY, null);
 	}
 
-	public resize(width: number, height: number): void {
-		this.ctx.viewport(0, 0, width, height);
+	public createTexture(data: TextureData): Texture {
+		const textureId = this.nextTextureId++;
+
+		this.offscreenCtx.clearRect(0, 0, this.textureSize, this.textureSize);
+		this.offscreenCtx.drawImage(data.source, 0, 0, this.textureSize, this.textureSize);
+
+		this.ctx.bindTexture(this.ctx.TEXTURE_2D_ARRAY, this.textureArray);
+		this.ctx.texSubImage3D(
+			this.ctx.TEXTURE_2D_ARRAY,
+			0,
+			0,
+			0,
+			textureId,
+			this.textureSize,
+			this.textureSize,
+			1,
+			this.ctx.RGBA,
+			this.ctx.UNSIGNED_BYTE,
+			this.offscreenCanvas
+		);
+		this.ctx.generateMipmap(this.ctx.TEXTURE_2D_ARRAY);
+
+		return { textureId: textureId };
 	}
+
+	// TODO: Implement material uploads to GPU.
+	public createMaterial(data: MaterialData): Material {
+		const materialID = this.nextMaterialId++;
+
+		return { materialID: materialID, materialData: data };
+	}
+
+
+	// ---------------------------------------------------------------------
+
 
 	private createVertexData(data: MeshData): {
 		vertexData: Float32Array;
@@ -183,7 +275,7 @@ export class WebGLBackend implements Backend {
 		this.ctx.bindBuffer(this.ctx.ELEMENT_ARRAY_BUFFER, ebo);
 		this.ctx.bufferData(this.ctx.ELEMENT_ARRAY_BUFFER, data.indices, drawType);
 
-		const stride = floatsPerVert * 4;
+		const stride = floatsPerVert * Float32Array.BYTES_PER_ELEMENT;
 		let offset = 0;
 
 		this.ctx.enableVertexAttribArray(this.shaderLocations.attributes.position);
@@ -195,7 +287,7 @@ export class WebGLBackend implements Backend {
 			stride,
 			offset,
 		);
-		offset += 12;
+		offset += 3 * Float32Array.BYTES_PER_ELEMENT;
 
 		const hasNormals = data.normals !== undefined && data.normals.length > 0;
 		if (hasNormals) {
@@ -208,7 +300,7 @@ export class WebGLBackend implements Backend {
 				stride,
 				offset,
 			);
-			offset += 12;
+			offset += 3 * Float32Array.BYTES_PER_ELEMENT;
 		}
 
 		const hasUVs = data.uvs !== undefined && data.uvs.length > 0;
@@ -224,6 +316,23 @@ export class WebGLBackend implements Backend {
 				stride,
 				offset,
 			);
+			offset += 2 * Float32Array.BYTES_PER_ELEMENT;
+		}
+
+		const hasTangents = data.tangents !== undefined && data.tangents.length > 0;
+		if (hasTangents) {
+			if (this.shaderLocations.attributes.tangent !== undefined &&
+				this.shaderLocations.attributes.tangent !== -1) {
+				this.ctx.enableVertexAttribArray(this.shaderLocations.attributes.tangent);
+				this.ctx.vertexAttribPointer(
+					this.shaderLocations.attributes.tangent,
+					4,
+					this.ctx.FLOAT,
+					false,
+					stride,
+					offset
+				);
+			}
 		}
 
 		this.ctx.bindVertexArray(null);
@@ -251,7 +360,6 @@ export class WebGLBackend implements Backend {
 
 		this.ctx.bindBuffer(this.ctx.ELEMENT_ARRAY_BUFFER, mesh.ebo);
 		this.ctx.bufferSubData(this.ctx.ELEMENT_ARRAY_BUFFER, 0, data.indices);
-		this.ctx.bindBuffer(this.ctx.ELEMENT_ARRAY_BUFFER, null);
 
 		mesh.indexCount = data.indices.length;
 		mesh.indexType =
@@ -260,34 +368,96 @@ export class WebGLBackend implements Backend {
 				: this.ctx.UNSIGNED_INT;
 	}
 
-	public drawMesh(mesh: Mesh, transformMatrix: Matrix4): void {
-		// Important note: Use transform matrix instantly (or copy) since it might get mutated in the future.
+	private bindMaterial(material: Material): void {
+		const data = material.materialData;
+
+		if (this.shaderLocations.uniforms.albedo) {
+			const albedo = data.albedo ?? [1, 1, 1, 1];
+			this.ctx.uniform4f(
+				this.shaderLocations.uniforms.albedo,
+				albedo[0],
+				albedo[1],
+				albedo[2],
+				albedo[3] ?? 1.0
+			);
+		}
+
+		if (this.shaderLocations.uniforms.pbrProperties) {
+			this.ctx.uniform3f(
+				this.shaderLocations.uniforms.pbrProperties,
+				data.roughness ?? 0.5,
+				data.metallic ?? 0.0,
+				data.ambientOcclusion ?? 1.0
+			);
+		}
+
+		if (this.shaderLocations.uniforms.textureIds) {
+			this.ctx.uniform4i(
+				this.shaderLocations.uniforms.textureIds,
+				data.albedoTexture?.textureId ?? -1,
+				data.normalTexture?.textureId ?? -1,
+				data.ormTexture?.textureId ?? -1,
+				data.heightTexture?.textureId ?? -1
+			);
+		}
+	}
+
+	public drawMesh(mesh: Mesh, material: Material, transformMatrix: Matrix4): void {
+		this.ctx.activeTexture(this.ctx.TEXTURE0);
+		this.ctx.bindTexture(this.ctx.TEXTURE_2D_ARRAY, this.textureArray);
+
+		this.bindMaterial(material);
 
 		this.ctx.bindVertexArray(mesh.vao);
 
-		this.ctx.uniformMatrix4fv(
-			this.shaderLocations.uniforms.meshTransform,
-			false,
-			transformMatrix.data,
-		);
+		if (this.shaderLocations.uniforms.meshTransform) {
+			this.ctx.uniformMatrix4fv(
+				this.shaderLocations.uniforms.meshTransform,
+				false,
+				transformMatrix.data
+			);
+		}
 
-		const normalMatrixData = Matrix4.normalMatrix(
-			transformMatrix,
-			this.tempNormalMatrix,
-		);
-		this.ctx.uniformMatrix3fv(
-			this.shaderLocations.uniforms.normalMatrix,
-			false,
-			normalMatrixData,
-		);
+		if (this.shaderLocations.uniforms.normalMatrix) {
+			const normalMatrixData = Matrix4.normalMatrix(
+				transformMatrix,
+				this.tempNormalMatrix
+			);
+			this.ctx.uniformMatrix3fv(
+				this.shaderLocations.uniforms.normalMatrix,
+				false,
+				normalMatrixData
+			);
+		}
 
 		this.ctx.drawElements(
 			this.ctx.TRIANGLES,
 			mesh.indexCount,
 			mesh.indexType,
-			0,
+			0
 		);
 
 		this.ctx.bindVertexArray(null);
+	}
+
+
+	// ---------------------------------------------------------------------
+
+
+	public clear(r: number, g: number, b: number, a: number): void {
+		this.ctx.clearColor(r / 255, g / 255, b / 255, a);
+		this.ctx.clear(this.ctx.COLOR_BUFFER_BIT | this.ctx.DEPTH_BUFFER_BIT);
+	}
+
+	public updateView(camera: Camera): void {
+		this.ctx.uniformMatrix4fv(
+			this.shaderLocations.uniforms.viewProjection,
+			false,
+			camera.viewProjectionMatrix.data,
+		);
+	}
+
+	public resize(width: number, height: number): void {
+		this.ctx.viewport(0, 0, width, height);
 	}
 }

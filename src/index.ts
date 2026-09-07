@@ -17,14 +17,56 @@ import { Backends } from "./core/renderer";
 import { Transform } from "./math/transform";
 import { Vector3 } from "./math/vector3";
 import { Quaternion } from "./math/quaternion";
+import { MaterialBuilder } from "./graphics/material";
+import { TextureBuilder } from "./graphics/texture";
 
-let canvas = document.createElement("canvas");
+const canvas = document.createElement("canvas");
 document.body.appendChild(canvas);
 
-let engine = new Engine(canvas, { backend: Backends.WEBGL });
+const engine = new Engine(canvas, { backend: Backends.WEBGL });
 
-let myMesh = engine.createMesh(MeshBuilder.Box(1, 1, 1));
-let myTransform = new Transform();
+const myMesh = engine.createMesh(MeshBuilder.Box(1, 1, 1));
+const myTransform = new Transform();
+
+const rock = engine.createMaterial(
+    MaterialBuilder.create({
+		albedo: [1, 1, 1, 1],
+		roughness: 1,
+		metallic: 0,
+		ambientOcclusion: 0,
+		albedoTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/ravine-cliff_albedo.png")),
+		normalTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/ravine-cliff_normal.png")),
+		ormTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/ravine-cliff_orm.png")),
+		heightTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/ravine-cliff_height.png"))
+	})
+);
+
+const metal = engine.createMaterial(
+    MaterialBuilder.create({
+		albedo: [1, 1, 1, 1],
+		roughness: 0.7,
+		metallic: 1,
+		ambientOcclusion: 1,
+		albedoTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/steelplate1_albedo.png")),
+		normalTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/steelplate1_normal.png")),
+		ormTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/steelplate1_orm.png")),
+		heightTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/steelplate1_height.png"))
+	})
+);
+
+const hexagon = engine.createMaterial(
+    MaterialBuilder.create({
+		albedo: [1, 1, 1, 1],
+		roughness: 0.7,
+		metallic: 1,
+		ambientOcclusion: 0,
+		albedoTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/futuristic-hex-armor_albedo.png")),
+		normalTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/futuristic-hex-armor_normal.png")),
+		ormTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/futuristic-hex-armor_orm.png")),
+		heightTexture: engine.createTexture(await TextureBuilder.fromURL("/src/assets/textures/futuristic-hex-armor_height.png"))
+	})
+);
+
 
 engine.start();
 
@@ -34,18 +76,34 @@ window.addEventListener("resize", () => {
 
 engine.resize(window.innerWidth, window.innerHeight);
 
-let cam = new PerspectiveCamera();
+const cam = new PerspectiveCamera();
 
 engine.setCamera(cam);
 
 engine.onFrame = (renderer, timestamp, delta) => {
 	renderer.clear(0, 0, 0, 1);
 
-	myTransform.setPosition(Math.sin(timestamp / 200) * 3, 0, -15);
-	myTransform.setScale(new Vector3(1, 1, 1));
+	//myTransform.setPosition(Math.sin(timestamp / 200) * 3, 0, -7);
+	//myTransform.setScale(new Vector3(1, 1, 1));
+	myTransform.setRotation(Quaternion.fromAxisAngle(new Vector3(Math.sin(timestamp / 2000), Math.sin(timestamp / 4000), Math.sin(timestamp / 6000)), timestamp / 2000));
 
-	renderer.drawMesh(myMesh, myTransform);
+	myTransform.setPosition(1.8, 0, -2.5);
+	renderer.drawMesh(myMesh, rock, myTransform);
 
-	renderer.drawCircle(-2, -2, 1, -10);
-	renderer.drawTriangle(2, Math.sin(timestamp / 2000)*2+1, -0.5, Math.sin(timestamp / 2000)+1, Math.sin(timestamp / 2000), -1, -10);
+	myTransform.setPosition(0, 0, -2.5);
+	renderer.drawMesh(myMesh, metal, myTransform);
+
+	myTransform.setPosition(-1.8, 0, -2.5);
+	renderer.drawMesh(myMesh, hexagon, myTransform);
+
+	// renderer.drawCircle(-2, -2, 1, -10);
+	// renderer.drawTriangle(
+	// 	2,
+	// 	Math.sin(timestamp / 2000) * 2 + 1,
+	// 	-0.5,
+	// 	Math.sin(timestamp / 2000) + 1,
+	// 	Math.sin(timestamp / 2000),
+	// 	-1,
+	// 	-10,
+	// );
 };
