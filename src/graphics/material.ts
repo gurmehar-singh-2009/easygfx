@@ -10,7 +10,6 @@ export interface Material {
 	albedoTexture?: Texture;
 	normalTexture?: Texture;
 	ormTexture?: Texture;
-	heightTexture?: Texture;
 }
 
 export class MaterialBuilder {
@@ -23,7 +22,6 @@ export class MaterialBuilder {
 		albedoTexture?: Texture;
 		normalTexture?: Texture;
 		ormTexture?: Texture;
-		heightTexture?: Texture;
 	}): Material {
 		return {
 			albedo: params?.albedo ?? [1, 1, 1, 1],
@@ -33,8 +31,7 @@ export class MaterialBuilder {
 			isUnlit: params?.isUnlit ?? 0,
 			albedoTexture: params?.albedoTexture,
 			normalTexture: params?.normalTexture,
-			ormTexture: params?.ormTexture,
-			heightTexture: params?.heightTexture,
+			ormTexture: params?.ormTexture
 		};
 	}
 }

@@ -415,12 +415,11 @@ export class WebGLBackend implements Backend {
 		}
 
 		if (this.shaderLocations.uniforms.textureIds) {
-			this.ctx.uniform4i(
+			this.ctx.uniform3i(
 				this.shaderLocations.uniforms.textureIds,
 				material.albedoTexture?.textureId ?? -1,
 				material.normalTexture?.textureId ?? -1,
-				material.ormTexture?.textureId ?? -1,
-				material.heightTexture?.textureId ?? -1,
+				material.ormTexture?.textureId ?? -1
 			);
 		}
 	}

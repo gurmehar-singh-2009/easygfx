@@ -45,12 +45,7 @@ const rock = MaterialBuilder.create({
 	),
 	ormTexture: engine.createTexture(
 		await TextureBuilder.fromURL("/src/assets/textures/ravine-cliff_orm.png"),
-	),
-	heightTexture: engine.createTexture(
-		await TextureBuilder.fromURL(
-			"/src/assets/textures/ravine-cliff_height.png",
-		),
-	),
+	)
 });
 
 const metal = MaterialBuilder.create({
@@ -66,10 +61,7 @@ const metal = MaterialBuilder.create({
 	),
 	ormTexture: engine.createTexture(
 		await TextureBuilder.fromURL("/src/assets/textures/steelplate1_orm.png"),
-	),
-	heightTexture: engine.createTexture(
-		await TextureBuilder.fromURL("/src/assets/textures/steelplate1_height.png"),
-	),
+	)
 });
 
 const hexagon = MaterialBuilder.create({
@@ -91,12 +83,7 @@ const hexagon = MaterialBuilder.create({
 		await TextureBuilder.fromURL(
 			"/src/assets/textures/futuristic-hex-armor_orm.png",
 		),
-	),
-	heightTexture: engine.createTexture(
-		await TextureBuilder.fromURL(
-			"/src/assets/textures/futuristic-hex-armor_height.png",
-		),
-	),
+	)
 });
 
 const red = MaterialBuilder.create({

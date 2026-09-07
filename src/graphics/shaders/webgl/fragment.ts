@@ -8,7 +8,7 @@ in vec4 v_tangent;
 
 uniform vec4 u_albedo;
 uniform vec4 u_pbrProperties;
-uniform ivec4 u_textureIds;
+uniform ivec3 u_textureIds;
 uniform mediump sampler2DArray u_textures;
 
 uniform vec3 u_cameraPosition;
@@ -16,11 +16,6 @@ uniform vec3 u_cameraPosition;
 out vec4 fragColor;
 
 const float PI = 3.14159265359;
-
-vec2 parallax(vec2 texCoords, vec3 viewDirTS, float heightLayer) {
-    float height = texture(u_textures, vec3(texCoords, heightLayer)).r * 0.05;
-    return texCoords - (viewDirTS.xy * height);
-}
 
 float DistributionGGX(vec3 N, vec3 H, float a) {
     a = a * a;
@@ -94,32 +89,21 @@ void main() {
         return;
     }
 
-
     vec3 N = normalize(v_normal);
     vec3 V = normalize(u_cameraPosition - v_worldPosition);
-    vec2 texCoords = v_texCoord;
-
-    if (u_textureIds.w >= 0 && length(v_tangent.xyz) > 0.0) {
-        vec3 T = normalize(v_tangent.xyz);
-        vec3 B = cross(N, T) * v_tangent.w;
-        mat3 worldToTangent = transpose(mat3(T, B, N));
-
-        vec3 viewDirTS = normalize(worldToTangent * V);
-        texCoords = parallax(v_texCoord, viewDirTS, float(u_textureIds.w));
-    }
 
     if (u_textureIds.y >= 0 && length(v_tangent.xyz) > 0.0) {
         vec3 T = normalize(v_tangent.xyz);
         vec3 B = cross(N, T) * v_tangent.w;
         mat3 TBN = mat3(T, B, N);
 
-        vec3 mapNormal = texture(u_textures, vec3(texCoords, float(u_textureIds.y))).rgb * 2.0 - 1.0;
+        vec3 mapNormal = texture(u_textures, vec3(v_texCoord, float(u_textureIds.y))).rgb * 2.0 - 1.0;
         N = normalize(TBN * mapNormal);
     }
 
     vec4 surfaceColor = u_albedo;
     if (u_textureIds.x >= 0) {
-        vec4 textureColor = texture(u_textures, vec3(texCoords, float(u_textureIds.x)));
+        vec4 textureColor = texture(u_textures, vec3(v_texCoord, float(u_textureIds.x)));
         surfaceColor *= textureColor;
     }
     vec3 albedoLinear = pow(surfaceColor.rgb, vec3(2.2));
@@ -129,7 +113,7 @@ void main() {
     float ao = u_pbrProperties.z;
 
     if (u_textureIds.z >= 0) {
-        vec3 orm = texture(u_textures, vec3(texCoords, float(u_textureIds.z))).rgb;
+        vec3 orm = texture(u_textures, vec3(v_texCoord, float(u_textureIds.z))).rgb;
         ao *= orm.r;
         roughness *= orm.g;
         metallic *= orm.b;
