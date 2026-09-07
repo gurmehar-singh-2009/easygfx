@@ -44,14 +44,14 @@
 
 | Importance | Feature                     | Status      |
 | :--------: | :-------------------------- | :---------- |
-|    High    | 2D shape primitives         | In progress |
-|    High    | 3D shape primitives         | In progress |
+|    High    | 2D shape primitives         | Complete |
+|    High    | 3D shape primitives         | Complete |
+|   Medium   | Text Rendering              | Complete |
 |    High    | Texture support             | In progress |
-|   Medium   | Text Rendering              | In Progress |
+|    Low     | Debug panel                 | In Progress |
 |   Medium   | Entities Support built in   | Planned     |
 |    Low     | WebGL/WebGPU tutorial       | Planned     |
 |    Low     | Multiplayer network support | Planned     |
-|    Low     | Debug panel                 | In Progress |
 |    Low     | Audio                       | Discussion  |
 |    Low     | Input Handling              | Discussion  |
 
