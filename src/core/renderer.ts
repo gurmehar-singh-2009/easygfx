@@ -1,9 +1,8 @@
-import type { Material, MaterialData } from "../graphics/material";
+import type { Material } from "../graphics/material";
 import type { Mesh, MeshData } from "../graphics/mesh";
 import type { Texture, TextureData } from "../graphics/texture";
 import type { Matrix4 } from "../math/matrix";
 import type { Camera } from "./camera";
-
 
 /** Backends. */
 export enum Backends {
@@ -32,7 +31,6 @@ export interface Backend {
 	clear?(r: number, g: number, b: number, a: number): void;
 
 	createTexture(data: TextureData): Texture;
-	createMaterial(data: MaterialData): Material;
 
 	createMesh(data: MeshData): Mesh;
 	updateMesh(mesh: Mesh, data: MeshData): void;

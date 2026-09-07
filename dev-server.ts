@@ -7,15 +7,15 @@ const server = Bun.serve({
 		"/": index,
 	},
 	async fetch(req) {
-        const url = new URL(req.url);
-        
-        const file = Bun.file(`.${url.pathname}`);
-        if (await file.exists()) {
-            return new Response(file);
-        }
+		const url = new URL(req.url);
 
-        return new Response("Not Found", { status: 404 });
-    },
+		const file = Bun.file(`.${url.pathname}`);
+		if (await file.exists()) {
+			return new Response(file);
+		}
+
+		return new Response("Not Found", { status: 404 });
+	},
 });
 
 console.log(`Listening on ${server.url}`);

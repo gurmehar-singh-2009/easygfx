@@ -6,7 +6,7 @@ import type { MeshData, Mesh } from "../../graphics/mesh";
 import { Transform } from "../../math/transform";
 import { Matrix4 } from "../../math/matrix";
 import { Vector3 } from "../../math/vector3";
-import type { Material, MaterialData } from "../../graphics/material";
+import type { Material } from "../../graphics/material";
 import type { Texture, TextureData } from "../../graphics/texture";
 
 interface ShaderLocations {
@@ -71,8 +71,14 @@ export class WebGLBackend implements Backend {
 	): void {
 		const program = this.ctx.createProgram();
 
-		const vertexShader = this.loadShader(this.ctx.VERTEX_SHADER, vertexShaderSource);
-		const fragmentShader = this.loadShader(this.ctx.FRAGMENT_SHADER, fragmentShaderSource);
+		const vertexShader = this.loadShader(
+			this.ctx.VERTEX_SHADER,
+			vertexShaderSource,
+		);
+		const fragmentShader = this.loadShader(
+			this.ctx.FRAGMENT_SHADER,
+			fragmentShaderSource,
+		);
 
 		this.ctx.attachShader(program, vertexShader);
 		this.ctx.attachShader(program, fragmentShader);
@@ -94,7 +100,7 @@ export class WebGLBackend implements Backend {
 				position: this.getAttributeLocation(program, "a_position"),
 				normal: this.getAttributeLocation(program, "a_normal"),
 				texCoord: this.getAttributeLocation(program, "a_texCoord"),
-				tangent: this.getAttributeLocation(program, "a_tangent")
+				tangent: this.getAttributeLocation(program, "a_tangent"),
 			},
 
 			uniforms: {
@@ -106,8 +112,8 @@ export class WebGLBackend implements Backend {
 				pbrProperties: this.getUniformLocation(program, "u_pbrProperties")!,
 				textureIds: this.getUniformLocation(program, "u_textureIds")!,
 
-				textures: this.getUniformLocation(program, "u_textures")!
-			}
+				textures: this.getUniformLocation(program, "u_textures")!,
+			},
 		};
 
 		this.ctx.useProgram(program);
@@ -138,7 +144,10 @@ export class WebGLBackend implements Backend {
 		return location;
 	}
 
-	private getUniformLocation(program: WebGLProgram, name: string): WebGLUniformLocation | null {
+	private getUniformLocation(
+		program: WebGLProgram,
+		name: string,
+	): WebGLUniformLocation | null {
 		const location = this.ctx.getUniformLocation(program, name);
 		if (!location) {
 			console.warn(`Uniform "${name}" not found.`);
@@ -146,9 +155,7 @@ export class WebGLBackend implements Backend {
 		return location;
 	}
 
-
 	// ---------------------------------------------------------------------
-
 
 	private initTextureArray(): void {
 		this.textureArray = this.ctx.createTexture();
@@ -162,13 +169,29 @@ export class WebGLBackend implements Backend {
 			this.ctx.RGBA8,
 			this.textureSize,
 			this.textureSize,
-			this.maxTextureLayers
+			this.maxTextureLayers,
 		);
 
-		this.ctx.texParameteri(this.ctx.TEXTURE_2D_ARRAY, this.ctx.TEXTURE_MIN_FILTER, this.ctx.LINEAR_MIPMAP_LINEAR);
-		this.ctx.texParameteri(this.ctx.TEXTURE_2D_ARRAY, this.ctx.TEXTURE_MAG_FILTER, this.ctx.LINEAR);
-		this.ctx.texParameteri(this.ctx.TEXTURE_2D_ARRAY, this.ctx.TEXTURE_WRAP_S, this.ctx.REPEAT);
-		this.ctx.texParameteri(this.ctx.TEXTURE_2D_ARRAY, this.ctx.TEXTURE_WRAP_T, this.ctx.REPEAT);
+		this.ctx.texParameteri(
+			this.ctx.TEXTURE_2D_ARRAY,
+			this.ctx.TEXTURE_MIN_FILTER,
+			this.ctx.LINEAR_MIPMAP_LINEAR,
+		);
+		this.ctx.texParameteri(
+			this.ctx.TEXTURE_2D_ARRAY,
+			this.ctx.TEXTURE_MAG_FILTER,
+			this.ctx.LINEAR,
+		);
+		this.ctx.texParameteri(
+			this.ctx.TEXTURE_2D_ARRAY,
+			this.ctx.TEXTURE_WRAP_S,
+			this.ctx.REPEAT,
+		);
+		this.ctx.texParameteri(
+			this.ctx.TEXTURE_2D_ARRAY,
+			this.ctx.TEXTURE_WRAP_T,
+			this.ctx.REPEAT,
+		);
 
 		this.ctx.bindTexture(this.ctx.TEXTURE_2D_ARRAY, null);
 	}
@@ -177,7 +200,13 @@ export class WebGLBackend implements Backend {
 		const textureId = this.nextTextureId++;
 
 		this.offscreenCtx.clearRect(0, 0, this.textureSize, this.textureSize);
-		this.offscreenCtx.drawImage(data.source, 0, 0, this.textureSize, this.textureSize);
+		this.offscreenCtx.drawImage(
+			data.source,
+			0,
+			0,
+			this.textureSize,
+			this.textureSize,
+		);
 
 		this.ctx.bindTexture(this.ctx.TEXTURE_2D_ARRAY, this.textureArray);
 		this.ctx.texSubImage3D(
@@ -191,23 +220,14 @@ export class WebGLBackend implements Backend {
 			1,
 			this.ctx.RGBA,
 			this.ctx.UNSIGNED_BYTE,
-			this.offscreenCanvas
+			this.offscreenCanvas,
 		);
 		this.ctx.generateMipmap(this.ctx.TEXTURE_2D_ARRAY);
 
 		return { textureId: textureId };
 	}
 
-	// TODO: Implement material uploads to GPU.
-	public createMaterial(data: MaterialData): Material {
-		const materialID = this.nextMaterialId++;
-
-		return { materialID: materialID, materialData: data };
-	}
-
-
 	// ---------------------------------------------------------------------
-
 
 	private createVertexData(data: MeshData): {
 		vertexData: Float32Array;
@@ -321,16 +341,20 @@ export class WebGLBackend implements Backend {
 
 		const hasTangents = data.tangents !== undefined && data.tangents.length > 0;
 		if (hasTangents) {
-			if (this.shaderLocations.attributes.tangent !== undefined &&
-				this.shaderLocations.attributes.tangent !== -1) {
-				this.ctx.enableVertexAttribArray(this.shaderLocations.attributes.tangent);
+			if (
+				this.shaderLocations.attributes.tangent !== undefined &&
+				this.shaderLocations.attributes.tangent !== -1
+			) {
+				this.ctx.enableVertexAttribArray(
+					this.shaderLocations.attributes.tangent,
+				);
 				this.ctx.vertexAttribPointer(
 					this.shaderLocations.attributes.tangent,
 					4,
 					this.ctx.FLOAT,
 					false,
 					stride,
-					offset
+					offset,
 				);
 			}
 		}
@@ -369,40 +393,43 @@ export class WebGLBackend implements Backend {
 	}
 
 	private bindMaterial(material: Material): void {
-		const data = material.materialData;
-
 		if (this.shaderLocations.uniforms.albedo) {
-			const albedo = data.albedo ?? [1, 1, 1, 1];
+			const albedo = material.albedo ?? [1, 1, 1, 1];
 			this.ctx.uniform4f(
 				this.shaderLocations.uniforms.albedo,
 				albedo[0],
 				albedo[1],
 				albedo[2],
-				albedo[3] ?? 1.0
+				albedo[3] ?? 1,
 			);
 		}
 
 		if (this.shaderLocations.uniforms.pbrProperties) {
-			this.ctx.uniform3f(
+			this.ctx.uniform4f(
 				this.shaderLocations.uniforms.pbrProperties,
-				data.roughness ?? 0.5,
-				data.metallic ?? 0.0,
-				data.ambientOcclusion ?? 1.0
+				material.roughness ?? 0.5,
+				material.metallic ?? 0,
+				material.ambientOcclusion ?? 1,
+				material.isUnlit ?? 0,
 			);
 		}
 
 		if (this.shaderLocations.uniforms.textureIds) {
 			this.ctx.uniform4i(
 				this.shaderLocations.uniforms.textureIds,
-				data.albedoTexture?.textureId ?? -1,
-				data.normalTexture?.textureId ?? -1,
-				data.ormTexture?.textureId ?? -1,
-				data.heightTexture?.textureId ?? -1
+				material.albedoTexture?.textureId ?? -1,
+				material.normalTexture?.textureId ?? -1,
+				material.ormTexture?.textureId ?? -1,
+				material.heightTexture?.textureId ?? -1,
 			);
 		}
 	}
 
-	public drawMesh(mesh: Mesh, material: Material, transformMatrix: Matrix4): void {
+	public drawMesh(
+		mesh: Mesh,
+		material: Material,
+		transformMatrix: Matrix4,
+	): void {
 		this.ctx.activeTexture(this.ctx.TEXTURE0);
 		this.ctx.bindTexture(this.ctx.TEXTURE_2D_ARRAY, this.textureArray);
 
@@ -414,19 +441,19 @@ export class WebGLBackend implements Backend {
 			this.ctx.uniformMatrix4fv(
 				this.shaderLocations.uniforms.meshTransform,
 				false,
-				transformMatrix.data
+				transformMatrix.data,
 			);
 		}
 
 		if (this.shaderLocations.uniforms.normalMatrix) {
 			const normalMatrixData = Matrix4.normalMatrix(
 				transformMatrix,
-				this.tempNormalMatrix
+				this.tempNormalMatrix,
 			);
 			this.ctx.uniformMatrix3fv(
 				this.shaderLocations.uniforms.normalMatrix,
 				false,
-				normalMatrixData
+				normalMatrixData,
 			);
 		}
 
@@ -434,15 +461,13 @@ export class WebGLBackend implements Backend {
 			this.ctx.TRIANGLES,
 			mesh.indexCount,
 			mesh.indexType,
-			0
+			0,
 		);
 
 		this.ctx.bindVertexArray(null);
 	}
 
-
 	// ---------------------------------------------------------------------
-
 
 	public clear(r: number, g: number, b: number, a: number): void {
 		this.ctx.clearColor(r / 255, g / 255, b / 255, a);

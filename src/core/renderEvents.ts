@@ -9,7 +9,7 @@ import { WebGLBackend } from "./backends/webgl";
 import { WebGPUBackend } from "./backends/webgpu";
 import type { Camera } from "./camera";
 import type { Backend, RenderConfigs } from "./renderer";
-import type { Material } from "../graphics/material";
+import { MaterialBuilder, type Material } from "../graphics/material";
 
 export class RenderEvent {
 	private configs: RenderConfigs;
@@ -17,6 +17,7 @@ export class RenderEvent {
 	private quadMesh: Mesh | undefined;
 	private triangleMesh: Mesh | undefined;
 	private regularPolygonCache: Map<number, Mesh> = new Map();
+	private unlitMaterial: Material = MaterialBuilder.create({ isUnlit: 1 });
 
 	private static readonly tempTransform = new Transform();
 	private static readonly tempVector1 = new Vector3();
@@ -51,6 +52,7 @@ export class RenderEvent {
 		y1: number,
 		x2: number,
 		y2: number,
+		colour: [number, number, number, number],
 		thickness: number = 0.1,
 		z: number = 0,
 	): void {
@@ -62,14 +64,21 @@ export class RenderEvent {
 			lineCenterY,
 			Math.hypot(x2 - x1, y2 - y1),
 			thickness,
+			colour,
 			Math.atan2(y2 - y1, x2 - x1),
 			z,
 		);
 	}
 
-	public drawCircle(x: number, y: number, radius: number, z: number = 0): void {
+	public drawCircle(
+		x: number,
+		y: number,
+		radius: number,
+		colour: [number, number, number, number],
+		z: number = 0,
+	): void {
 		// For now. Can add SDFs to material later.
-		this.drawRegularPolygon(x, y, radius * 2, 32, 0, z);
+		this.drawRegularPolygon(x, y, radius * 2, 32, colour, 0, z);
 	}
 
 	public drawRect(
@@ -77,6 +86,7 @@ export class RenderEvent {
 		y: number,
 		w: number,
 		h: number,
+		colour: [number, number, number, number],
 		rot: number = 0,
 		z: number = 0,
 	): void {
@@ -86,7 +96,9 @@ export class RenderEvent {
 		RenderEvent.tempTransform.setPosition(x, y, z);
 		RenderEvent.tempTransform.setRotationEuler(0, 0, rot);
 		RenderEvent.tempTransform.setScale(w, h, 1);
-		//this.drawMesh(this.quadMesh, RenderEvent.tempTransform);
+		this.unlitMaterial.albedo = colour;
+
+		this.drawMesh(this.quadMesh, this.unlitMaterial, RenderEvent.tempTransform);
 	}
 
 	public drawTriangle(
@@ -96,6 +108,7 @@ export class RenderEvent {
 		y2: number,
 		x3: number,
 		y3: number,
+		colour: [number, number, number, number],
 		z: number = 0,
 	): void {
 		if (!this.triangleMesh) {
@@ -110,8 +123,13 @@ export class RenderEvent {
 			RenderEvent.tempVector2,
 			RenderEvent.tempVector3,
 		);
+		this.unlitMaterial.albedo = colour;
 
-		//this.drawMesh(this.triangleMesh, RenderEvent.tempTransform);
+		this.drawMesh(
+			this.triangleMesh,
+			this.unlitMaterial,
+			RenderEvent.tempTransform,
+		);
 	}
 
 	public drawRegularPolygon(
@@ -119,6 +137,7 @@ export class RenderEvent {
 		y: number,
 		size: number,
 		sides: number,
+		colour: [number, number, number, number],
 		rot: number = 0,
 		z: number = 0,
 	): void {
@@ -136,7 +155,9 @@ export class RenderEvent {
 		RenderEvent.tempTransform.setPosition(x, y, z);
 		RenderEvent.tempTransform.setRotationEuler(0, 0, rot || 0);
 		RenderEvent.tempTransform.setScale(size, size, 1);
-		//this.drawMesh(mesh, RenderEvent.tempTransform);
+		this.unlitMaterial.albedo = colour;
+
+		this.drawMesh(mesh, this.unlitMaterial, RenderEvent.tempTransform);
 	}
 
 	public drawPolygon(vertices: Array<Vector2>): void {}
@@ -155,40 +176,44 @@ export class RenderEvent {
 		x: number,
 		y: number,
 		size: number,
+		colour: [number, number, number, number],
 		rot: number = 0,
 		z: number = 0,
 	): void {
-		this.drawRegularPolygon(x, y, size, 5, rot, z);
+		this.drawRegularPolygon(x, y, size, 5, colour, rot, z);
 	}
 
 	public drawHexagon(
 		x: number,
 		y: number,
 		size: number,
+		colour: [number, number, number, number],
 		rot: number = 0,
 		z: number = 0,
 	): void {
-		this.drawRegularPolygon(x, y, size, 6, rot, z);
+		this.drawRegularPolygon(x, y, size, 6, colour, rot, z);
 	}
 
 	public drawSeptagon(
 		x: number,
 		y: number,
 		size: number,
+		colour: [number, number, number, number],
 		rot: number = 0,
 		z: number = 0,
 	): void {
-		this.drawRegularPolygon(x, y, size, 7, rot, z);
+		this.drawRegularPolygon(x, y, size, 7, colour, rot, z);
 	}
 
 	public drawOctagon(
 		x: number,
 		y: number,
 		size: number,
+		colour: [number, number, number, number],
 		rot: number = 0,
 		z: number = 0,
 	): void {
-		this.drawRegularPolygon(x, y, size, 8, rot, z);
+		this.drawRegularPolygon(x, y, size, 8, colour, rot, z);
 	}
 
 	public drawMesh(mesh: Mesh, material: Material, transform: Transform): void {

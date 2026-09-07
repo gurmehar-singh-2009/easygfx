@@ -3,7 +3,7 @@ import type { RenderConfigs } from "./renderer";
 import type { Camera } from "./camera";
 import type { Mesh, MeshData } from "../graphics/mesh";
 import type { Texture, TextureData } from "../graphics/texture";
-import type { Material, MaterialData } from "../graphics/material";
+import type { Material } from "../graphics/material";
 
 export class Engine {
 	private canvas: HTMLCanvasElement;
@@ -91,9 +91,5 @@ export class Engine {
 
 	public createTexture(data: TextureData): Texture {
 		return this.renderEvent.backend.createTexture(data);
-	}
-
-	public createMaterial(data: MaterialData): Material {
-		return this.renderEvent.backend.createMaterial(data);
 	}
 }

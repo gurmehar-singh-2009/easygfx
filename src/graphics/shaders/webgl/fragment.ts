@@ -7,7 +7,7 @@ in vec2 v_texCoord;
 in vec4 v_tangent;
 
 uniform vec4 u_albedo;
-uniform vec3 u_pbrProperties;
+uniform vec4 u_pbrProperties;
 uniform ivec4 u_textureIds;
 uniform mediump sampler2DArray u_textures;
 
@@ -83,7 +83,18 @@ vec3 acesToneMapping(vec3 x) {
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
-void main() {
+void main() { 
+    if (u_pbrProperties.w > 0.5) {
+        vec4 surfaceColor = u_albedo;
+        if (u_textureIds.x >= 0) {
+            vec4 textureColor = texture(u_textures, vec3(v_texCoord, float(u_textureIds.x)));
+            surfaceColor *= textureColor;
+        }
+        fragColor = surfaceColor;
+        return;
+    }
+
+
     vec3 N = normalize(v_normal);
     vec3 V = normalize(u_cameraPosition - v_worldPosition);
     vec2 texCoords = v_texCoord;
@@ -126,7 +137,7 @@ void main() {
     }
 
     vec3 lightColor = vec3(10.0, 10.0, 10.0);
-    vec3 lightVector = normalize(vec3(0.5, 0.0, 1.0));
+    vec3 lightVector = normalize(vec3(0.0, 0.0, 1.0));
     vec3 halfVector = normalize(lightVector + V);
 
     vec3 baseReflectivity = mix(vec3(0.04), albedoLinear, metallic);
@@ -148,4 +159,4 @@ void main() {
     color = pow(color, vec3(1.0 / 2.2));
 
     fragColor = vec4(color, surfaceColor.a);
-} `;
+}`;
