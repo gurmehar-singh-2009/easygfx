@@ -151,3 +151,4 @@ engine.onFrame = (renderer, timestamp, delta) => {
 	myTransform.setPosition(1.8, 0.9, -2.5);
 	renderer.drawMesh(myMesh, blue, myTransform);
 };
+

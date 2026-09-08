@@ -9,15 +9,8 @@ export interface Camera {
 	viewMatrix: Matrix4;
 	viewProjectionMatrix: Matrix4;
 
-	// setPosition(position: Vector3): void;
-	// setRotation(rotation: Quaternion): void;
-	// translate(offset: Vector3): void;
-	// rotate(rotationDelta: Quaternion): void;
-	// lookAt(target: Vector3, up?: Vector3): void;
-
-	// getForward(): Vector3;
-	// getRight(): Vector3;
-	// getUp(): Vector3;
+	setPosition(position: Vector3): void;
+	setRotation(rotation: Quaternion): void;
 
 	resize(width: number, height: number): void;
 
@@ -69,6 +62,20 @@ export class PerspectiveCamera implements Camera {
 		this.updateProjectionMatrix();
 		this.updateViewProjectionMatrix();
 
+		this.onUpdateView();
+	}
+	
+	public setPosition(position: Vector3): void {
+		this.position = position;
+		this.updateViewMatrix();
+		this.updateViewProjectionMatrix();
+		this.onUpdateView();
+	}
+
+	public setRotation(rotation: Quaternion): void {
+		this.rotation = rotation;
+		this.updateViewMatrix();
+		this.updateViewProjectionMatrix();
 		this.onUpdateView();
 	}
 
@@ -157,6 +164,20 @@ export class OrthographicCamera implements Camera {
 		this.updateProjectionMatrix();
 		this.updateViewProjectionMatrix();
 
+		this.onUpdateView();
+	}
+	
+	public setPosition(position: Vector3): void {
+		this.position = position;
+		this.updateViewMatrix();
+		this.updateViewProjectionMatrix();
+		this.onUpdateView();
+	}
+
+	public setRotation(rotation: Quaternion): void {
+		this.rotation = rotation;
+		this.updateViewMatrix();
+		this.updateViewProjectionMatrix();
 		this.onUpdateView();
 	}
 
