@@ -17,6 +17,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.5.10",
 		"@types/bun": "^1.4.0",
+		"@types/webrtc": "^0.0.47",
 		"@webgpu/types": "^0.1.72",
 		"documentation": "^14.0.3",
 		"typedoc": "^0.28.20",
@@ -27,5 +28,7 @@
 	"peerDependencies": {
 		"typescript": "^5"
 	},
-	"dependencies": {}
+	"dependencies": {
+		"msgpackr": "^2.1.0"
+	}
 }
