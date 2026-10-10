@@ -84,7 +84,7 @@ engine.onFrame = (renderer, timestamp) => {
   renderer.clear(0, 0, 0, 1);
 
   renderer.setColor(255, 0, 0, 1);
-  renderer.drawSquare(40, 40, 50, 50);
+  renderer.drawRect(40, 40, 50, 50);
 
   renderer.setColor(255, 255, 255, 1);
   renderer.drawText(50, 100, "Working Demo!", 22);
