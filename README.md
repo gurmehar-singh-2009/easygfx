@@ -55,6 +55,10 @@
 |    Low     | Audio                       | Discussion  |
 |    Low     | Input Handling              | Discussion  |
 
+## Documentation
+
+Documentation for this library can be found [here](https://gurmeharsingh2009.me/easygfx/).
+
 ## Demo
 
 ```ts
