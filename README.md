@@ -94,3 +94,6 @@ engine.onFrame = (renderer, timestamp) => {
   renderer.drawText(50, 100, "Working Demo!", 22);
 };
 ```
+
+# Screenshots of Demo
+<img width="892" height="589" alt="image" src="https://github.com/user-attachments/assets/8f00391a-27f8-41b3-b5da-8efb53439b86" />
